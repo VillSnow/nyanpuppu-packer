@@ -1,83 +1,68 @@
 #![allow(non_snake_case)]
 
+mod main_tab;
+mod settings_tab;
+
 use dioxus::prelude::*;
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
+use main_tab::MainTab;
+use settings_tab::SettingsTab;
 
 static CSS: Asset = asset!("/assets/styles.css");
-static TAURI_ICON: Asset = asset!("/assets/tauri.svg");
-static DIOXUS_ICON: Asset = asset!("/assets/dioxus.png");
+static EMOJIS_GRID_CSS: Asset = asset!("/assets/emojis-grid.css");
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"])]
-    async fn invoke(cmd: &str, args: JsValue) -> JsValue;
+#[derive(Clone, Copy, PartialEq)]
+enum Tab {
+    Main,
+    Settings,
 }
 
-#[derive(Serialize, Deserialize)]
-struct GreetArgs<'a> {
-    name: &'a str,
-}
-
+/// タブの切り替えのみを担当する。各タブは常にマウントされ、自身の状態を保持する。
 pub fn App() -> Element {
-    let mut name = use_signal(|| String::new());
-    let mut greet_msg = use_signal(|| String::new());
-
-    let greet = move |event: FormEvent| async move {
-        event.prevent_default();
-
-        if name.read().is_empty() {
-            return;
-        }
-
-        let name = name.read();
-        let args = serde_wasm_bindgen::to_value(&GreetArgs { name: &*name }).unwrap();
-        // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-        let new_msg = invoke("greet", args).await.as_string().unwrap();
-        greet_msg.set(new_msg);
-    };
+    let mut current_tab = use_signal(|| Tab::Main);
 
     rsx! {
         link { rel: "stylesheet", href: CSS }
-        main {
-            class: "container",
-            h1 { "Welcome to Tauri + Dioxus" }
+        link { rel: "stylesheet", href: EMOJIS_GRID_CSS }
 
-            div {
-                class: "row",
-                a {
-                    href: "https://tauri.app",
-                    target: "_blank",
-                    img {
-                        src: TAURI_ICON,
-                        class: "logo tauri",
-                         alt: "Tauri logo"
-                    }
+        div { class: "app-shell",
+            nav { class: "tab-bar", aria_label: "ページ",
+                TabButton {
+                    label: "パッケージ作成",
+                    tab: Tab::Main,
+                    current_tab: current_tab(),
+                    onselect: move |tab| current_tab.set(tab),
                 }
-                a {
-                    href: "https://dioxuslabs.com/",
-                    target: "_blank",
-                    img {
-                        src: DIOXUS_ICON,
-                        class: "logo dioxus",
-                        alt: "Dioxus logo"
-                    }
+                TabButton {
+                    label: "管理",
+                    tab: Tab::Settings,
+                    current_tab: current_tab(),
+                    onselect: move |tab| current_tab.set(tab),
                 }
             }
-            p { "Click on the Tauri and Dioxus logos to learn more." }
-
-            form {
-                class: "row",
-                onsubmit: greet,
-                input {
-                    id: "greet-input",
-                    placeholder: "Enter a name...",
-                    value: "{name}",
-                    oninput: move |event| name.set(event.value())
-                }
-                button { r#type: "submit", "Greet" }
+            main { class: "workspace",
+                MainTab { active: current_tab() == Tab::Main }
+                SettingsTab { active: current_tab() == Tab::Settings }
             }
-            p { "{greet_msg}" }
+        }
+    }
+}
+
+#[component]
+fn TabButton(
+    label: &'static str,
+    tab: Tab,
+    current_tab: Tab,
+    onselect: EventHandler<Tab>,
+) -> Element {
+    let active = tab == current_tab;
+
+    rsx! {
+        button {
+            class: if active { "tab-button active" } else { "tab-button" },
+            r#type: "button",
+            aria_current: if active { "page" } else { "false" },
+            onclick: move |_| onselect.call(tab),
+            "{label}"
         }
     }
 }
