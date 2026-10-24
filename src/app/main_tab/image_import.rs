@@ -121,6 +121,7 @@ pub fn import_images(
 
         let scope = emojis.origin_scope();
         emojis.with_mut(|current| {
+            // 照合中にemojis が変更されている可能性があるので、既知のMD5ハッシュを収集して重複を排除する
             let mut known_md5_hashes = current
                 .iter()
                 .map(|emoji| emoji.read().md5.clone())
