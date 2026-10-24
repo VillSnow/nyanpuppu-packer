@@ -690,6 +690,7 @@ pub fn run() {
             export_emoji_package,
             import_emoji_package,
             list_servers,
+            database::list_server_emojis,
             database::rebuild_hash_parts,
             add_server,
             remove_server,

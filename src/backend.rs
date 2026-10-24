@@ -25,6 +25,15 @@ pub struct EmojiMatch {
     pub distance: u32,
 }
 
+#[derive(Clone, Deserialize, PartialEq)]
+pub struct ServerEmoji {
+    pub name: String,
+    pub category: Option<String>,
+    pub aliases: Vec<String>,
+    pub license: Option<String>,
+    pub image_url: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct FetchSummary {
     pub emoji_count: usize,
@@ -137,6 +146,10 @@ fn bytes_to_js(bytes: &[u8]) -> js_sys::Array {
 
 pub async fn list_servers() -> Result<Vec<Server>, String> {
     invoke("list_servers", Object::new().into()).await
+}
+
+pub async fn list_server_emojis(host: String) -> Result<Vec<ServerEmoji>, String> {
+    invoke("list_server_emojis", invoke_args("host", host.into())).await
 }
 
 pub async fn add_server(url: String) -> Result<bool, String> {

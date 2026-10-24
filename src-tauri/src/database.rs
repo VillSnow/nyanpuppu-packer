@@ -324,6 +324,47 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
         .map_err(|e| e.to_string())
 }
 
+#[derive(Serialize)]
+pub struct ServerEmoji {
+    pub name: String,
+    pub category: Option<String>,
+    pub aliases: Vec<String>,
+    pub license: Option<String>,
+    pub image_url: Option<String>,
+}
+
+#[tauri::command]
+pub fn list_server_emojis(
+    app: tauri::AppHandle,
+    host: String,
+) -> Result<Vec<ServerEmoji>, String> {
+    let connection = open_database(&app)?;
+    let mut statement = connection
+        .prepare(
+            "select name, category, aliases, license, image_url
+             from emojis where host = ?1 order by name",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![host], |row| {
+            let aliases_json: Option<String> = row.get(2)?;
+            let mut aliases = aliases_json
+                .and_then(|json| serde_json::from_str::<Vec<String>>(&json).ok())
+                .unwrap_or_default();
+            aliases.retain(|alias| !alias.trim().is_empty());
+            Ok(ServerEmoji {
+                name: row.get(0)?,
+                category: row.get(1)?,
+                aliases,
+                license: row.get(3)?,
+                image_url: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, String> {
     let url = url.trim().trim_end_matches('/').to_string();
