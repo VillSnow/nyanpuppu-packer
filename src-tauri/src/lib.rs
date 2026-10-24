@@ -274,16 +274,32 @@ async fn load_image_hash(
     Ok((hash, image.metadata, ImageLoadOutcome::Downloaded))
 }
 
+/// サーバー URL から、HTTP API の指数バックオフを設定した metol クライアントを作る。
+pub(crate) fn create_metol_client(url: &str) -> metol::Client {
+    metol::Client::with_endpoints(url.to_string(), String::new(), None).configure_http_api_backoff(
+        8,
+        std::time::Duration::from_secs(1),
+        2,
+    )
+}
+
+/// 単一サーバーの API (画像を除く) への同時リクエスト数の上限。
+const MAX_CONCURRENT_API_REQUESTS: usize = 2;
+
 #[tauri::command]
 async fn fetch_server_emojis(app: tauri::AppHandle, id: i64) -> Result<FetchSummary, String> {
     let server_url = database::server_url(&app, id)?;
+    let api_semaphore = Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_API_REQUESTS));
 
     tracing::info!(server_id = id, "絵文字の取得を開始します");
     report_fetch_progress(&app, id, "listing", 0, 0);
-    let client = metol::Client::with_endpoints(server_url.clone(), String::new(), None)
-        .configure_http_api_backoff(8, std::time::Duration::from_secs(1), 2);
+    let client = create_metol_client(&server_url);
 
-    match client.meta().await {
+    let meta_result = {
+        let _permit = api_semaphore.acquire().await.map_err(|e| e.to_string())?;
+        client.meta().await
+    };
+    match meta_result {
         Ok(meta) => {
             match database::update_server_meta(&app, id, meta.lite.name, meta.lite.short_name) {
                 Ok(true) => tracing::info!(
@@ -301,10 +317,13 @@ async fn fetch_server_emojis(app: tauri::AppHandle, id: i64) -> Result<FetchSumm
         }
     }
 
-    let response = client
-        .get_emojis(metol::mi_api_types::emojis::Request::default())
-        .await
-        .map_err(|e| format!("サーバーから絵文字一覧を取得できません: {e}"))?;
+    let response = {
+        let _permit = api_semaphore.acquire().await.map_err(|e| e.to_string())?;
+        client
+            .get_emojis(metol::mi_api_types::emojis::Request::default())
+            .await
+            .map_err(|e| format!("サーバーから絵文字一覧を取得できません: {e}"))?
+    };
     let total = response.emojis.len();
     tracing::info!(
         server_id = id,
@@ -321,6 +340,7 @@ async fn fetch_server_emojis(app: tauri::AppHandle, id: i64) -> Result<FetchSumm
     let progress_step = total.div_ceil(10).max(1);
     let items = stream::iter(response.emojis.into_iter().map(|emoji| {
         let client = &client;
+        let api_semaphore = Arc::clone(&api_semaphore);
         let image_client = image_client.clone();
         let completed = Arc::clone(&completed);
         let successful_count = Arc::clone(&successful_count);
@@ -329,12 +349,16 @@ async fn fetch_server_emojis(app: tauri::AppHandle, id: i64) -> Result<FetchSumm
         let app = app.clone();
         let cached_image = cached_images.get(&emoji.name).cloned();
         async move {
-            let license = match client
-                .get_emoji(metol::mi_api_types::emoji::Request {
-                    name: emoji.name.clone(),
-                })
-                .await
-            {
+            let detail_result = {
+                // 画像取得中は許可を保持しないよう、API 呼び出しの間だけ確保する
+                let _permit = api_semaphore.acquire().await;
+                client
+                    .get_emoji(metol::mi_api_types::emoji::Request {
+                        name: emoji.name.clone(),
+                    })
+                    .await
+            };
+            let license = match detail_result {
                 Ok(detail) => detail.license,
                 Err(error) => {
                     tracing::error!(

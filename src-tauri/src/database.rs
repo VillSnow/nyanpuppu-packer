@@ -436,8 +436,7 @@ pub async fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, Stri
         return Err("http または https のサーバーURLを入力してください".to_string());
     }
 
-    let client = metol::Client::with_endpoints(url.clone(), String::new(), None)
-        .configure_http_api_backoff(8, std::time::Duration::from_secs(1), 2);
+    let client = crate::create_metol_client(&url);
 
     let meta = client
         .meta()
