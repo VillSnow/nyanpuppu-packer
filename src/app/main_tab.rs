@@ -144,9 +144,63 @@ fn EmojisToolbar(
     let mut exporting = use_signal(|| false);
 
     rsx! {
-        div { class: "emojis-toolbar",
-            p { "選択中: {selected_count} 件" }
-            div { class: "emojis-toolbar-actions",
+        div { class: "emojis-toolbars",
+            div { class: "emojis-toolbar",
+                p { "選択中: {selected_count} 件" }
+                div { class: "emojis-toolbar-actions",
+                    button {
+                        class: "emojis-toolbar-danger-button",
+                        r#type: "button",
+                        disabled: selected_count == 0,
+                        onclick: move |_| pending_delete_count.set(Some(selected_count)),
+                        "選択中の画像を削除"
+                    }
+                    button {
+                        class: "emojis-toolbar-export-button",
+                        r#type: "button",
+                        disabled: selected_count == 0 || exporting(),
+                        onclick: move |_| {
+                            let export_emojis = emojis
+                                .read()
+                                .iter()
+                                .filter(|emoji| emoji.read().selected)
+                                .map(|emoji| ExportEmoji {
+                                    file_name: emoji.read().file_name.clone(),
+                                    emoji_name: emoji.read().emoji_name.clone(),
+                                    category: emoji.read().category.clone(),
+                                    aliases: emoji.read().aliases.clone(),
+                                    license: emoji.read().license.clone(),
+                                    image: emoji.read().bytes.as_ref().clone(),
+                                })
+                                .collect::<Vec<_>>();
+                            exporting.set(true);
+                            export_message.set("書き出しています…".to_string());
+                            spawn(async move {
+                                match export_emoji_package(export_emojis).await {
+                                    Ok(Some(summary)) => {
+                                        export_message
+                                            .set(
+                                                format!(
+                                                    "{} 件を書き出しました: {}",
+                                                    summary.emoji_count,
+                                                    summary.path,
+                                                ),
+                                            )
+                                    }
+                                    Ok(None) => export_message.set(String::new()),
+                                    Err(error) => export_message.set(error),
+                                }
+                                exporting.set(false);
+                            });
+                        },
+                        "選択中の画像を書き出し"
+                    }
+                }
+                if !export_message.read().is_empty() {
+                    p { style: "white-space: pre-line;", "{export_message}" }
+                }
+            }
+            div { class: "emojis-toolbar column-visibility-card",
                 div { class: "column-visibility-controls",
                     LabeledCheckbox {
                         label: "ファイル名を表示",
@@ -173,56 +227,6 @@ fn EmojisToolbar(
                         flag: visibilities.candidates,
                     }
                 }
-                button {
-                    class: "emojis-toolbar-danger-button",
-                    r#type: "button",
-                    disabled: selected_count == 0,
-                    onclick: move |_| pending_delete_count.set(Some(selected_count)),
-                    "選択中の画像を削除"
-                }
-                button {
-                    class: "emojis-toolbar-export-button",
-                    r#type: "button",
-                    disabled: selected_count == 0 || exporting(),
-                    onclick: move |_| {
-                        let export_emojis = emojis
-                            .read()
-                            .iter()
-                            .filter(|emoji| emoji.read().selected)
-                            .map(|emoji| ExportEmoji {
-                                file_name: emoji.read().file_name.clone(),
-                                emoji_name: emoji.read().emoji_name.clone(),
-                                category: emoji.read().category.clone(),
-                                aliases: emoji.read().aliases.clone(),
-                                license: emoji.read().license.clone(),
-                                image: emoji.read().bytes.as_ref().clone(),
-                            })
-                            .collect::<Vec<_>>();
-                        exporting.set(true);
-                        export_message.set("書き出しています…".to_string());
-                        spawn(async move {
-                            match export_emoji_package(export_emojis).await {
-                                Ok(Some(summary)) => {
-                                    export_message
-                                        .set(
-                                            format!(
-                                                "{} 件を書き出しました: {}",
-                                                summary.emoji_count,
-                                                summary.path,
-                                            ),
-                                        )
-                                }
-                                Ok(None) => export_message.set(String::new()),
-                                Err(error) => export_message.set(error),
-                            }
-                            exporting.set(false);
-                        });
-                    },
-                    "選択中の画像を書き出し"
-                }
-            }
-            if !export_message.read().is_empty() {
-                p { style: "white-space: pre-line;", "{export_message}" }
             }
         }
     }
