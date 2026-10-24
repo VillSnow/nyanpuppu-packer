@@ -122,58 +122,60 @@ fn ReviewTable(
     }
 
     rsx! {
-        table { class: "export-review-table",
-            thead {
-                tr {
-                    th { "プレビュー" }
-                    th { "ファイル名" }
-                    th { "絵文字名" }
-                    th { "カテゴリ" }
-                    th { "タグ" }
-                    th { "ライセンス" }
-                }
-            }
-            // 区切り線を絵文字単位で引くため、絵文字ごとに tbody を分ける
-            for (emoji , rows) in targets {
-                tbody { key: "{emoji.md5}",
+        div { class: "export-review-scroll",
+            table { class: "export-review-table",
+                thead {
                     tr {
-                        td {
-                            img { src: "{emoji.preview}", alt: "" }
-                        }
-                        td { "{emoji.file_name}" }
-                        td {
-                            {cell_text(&emoji.emoji_name)}
-                            if comparing && !pending && rows.is_empty() {
-                                div { class: "empty-value", "サーバーに同名・近い絵文字なし" }
-                            }
-                        }
-                        td { {cell_text(&emoji.category)} }
-                        td { {cell_text(&emoji.aliases.join(", "))} }
-                        td { {cell_text(&emoji.license)} }
+                        th { "プレビュー" }
+                        th { "ファイル名" }
+                        th { "絵文字名" }
+                        th { "カテゴリ" }
+                        th { "タグ" }
+                        th { "ライセンス" }
                     }
-                    for row in rows {
-                        {
-                            let category_differs = row.category != emoji.category.trim();
-                            let aliases_differs = sorted_aliases(&row.aliases)
-                                != sorted_aliases(&emoji.aliases);
-                            let license_differs = row.license != emoji.license.trim();
-                            rsx! {
-                                tr { key: "{row.name}", class: "server-row", title: "サーバーの値",
-                                    td {
-                                        if let Some(image_url) = &row.image_url {
-                                            img { src: "{image_url}", alt: "" }
+                }
+                // 区切り線を絵文字単位で引くため、絵文字ごとに tbody を分ける
+                for (emoji , rows) in targets {
+                    tbody { key: "{emoji.md5}",
+                        tr {
+                            td {
+                                img { src: "{emoji.preview}", alt: "" }
+                            }
+                            td { "{emoji.file_name}" }
+                            td {
+                                {cell_text(&emoji.emoji_name)}
+                                if comparing && !pending && rows.is_empty() {
+                                    div { class: "empty-value", "サーバーに同名・近い絵文字なし" }
+                                }
+                            }
+                            td { {cell_text(&emoji.category)} }
+                            td { {cell_text(&emoji.aliases.join(", "))} }
+                            td { {cell_text(&emoji.license)} }
+                        }
+                        for row in rows {
+                            {
+                                let category_differs = row.category != emoji.category.trim();
+                                let aliases_differs = sorted_aliases(&row.aliases)
+                                    != sorted_aliases(&emoji.aliases);
+                                let license_differs = row.license != emoji.license.trim();
+                                rsx! {
+                                    tr { key: "{row.name}", class: "server-row", title: "サーバーの値",
+                                        td {
+                                            if let Some(image_url) = &row.image_url {
+                                                img { src: "{image_url}", alt: "" }
+                                            }
                                         }
-                                    }
-                                    td {}
-                                    td { {cell_text(&row.name)} }
-                                    td { class: if category_differs { "differs" },
-                                        {cell_text(&row.category)}
-                                    }
-                                    td { class: if aliases_differs { "differs" },
-                                        {cell_text(&row.aliases.join(", "))}
-                                    }
-                                    td { class: if license_differs { "differs" },
-                                        {cell_text(&row.license)}
+                                        td {}
+                                        td { {cell_text(&row.name)} }
+                                        td { class: if category_differs { "differs" },
+                                            {cell_text(&row.category)}
+                                        }
+                                        td { class: if aliases_differs { "differs" },
+                                            {cell_text(&row.aliases.join(", "))}
+                                        }
+                                        td { class: if license_differs { "differs" },
+                                            {cell_text(&row.license)}
+                                        }
                                     }
                                 }
                             }
@@ -346,7 +348,7 @@ pub fn ExportTab(active: bool) -> Element {
 
     rsx! {
         div { class: "workspace-content export-tab", hidden: !active,
-            section {
+            section { class: "export-tab-section",
                 p { class: "emojis-toolbar-count", "書き出し対象: {emoji_count} 件" }
                 label { class: "export-compare-select",
                     span { "比較先サーバー" }
@@ -456,7 +458,7 @@ pub fn ExportTab(active: bool) -> Element {
                     }
                 }
                 if !export_message.read().is_empty() {
-                    p { style: "white-space: pre-line;", "{export_message}" }
+                    p { class: "export-message", "{export_message}" }
                 }
             }
         }

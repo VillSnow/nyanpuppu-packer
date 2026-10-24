@@ -1,6 +1,6 @@
 use crate::backend::{
-    FetchProgress, Server, add_server, fetch_server_emojis, list_servers, rebuild_hash_parts,
-    remove_server, set_server_favorite,
+    FetchProgress, Server, add_server, fetch_server_emojis, list_servers, remove_server,
+    set_server_favorite,
 };
 use dioxus::prelude::*;
 use std::collections::HashMap;
@@ -12,7 +12,6 @@ pub fn ServerManagement(
     mut progress: Signal<HashMap<i64, FetchProgress>>,
 ) -> Element {
     let mut url = use_signal(String::new);
-    let mut rebuilding_hash_parts = use_signal(|| false);
     let server_list = servers.read().clone();
     let progress_by_server = progress.read().clone();
 
@@ -24,50 +23,6 @@ pub fn ServerManagement(
                     h1 { "管理" }
                     p { class: "management-card-description",
                         "サーバーの登録と絵文字データの同期を管理します。"
-                    }
-                }
-            }
-            div { class: "management-card-section index-section",
-                div { class: "management-section-heading",
-                    div {
-                        h2 { "ハッシュ検索インデックス" }
-                        p {
-                            "ハッシュの分割方式を変更した場合、保存済みデータの索引を再構築してください。"
-                        }
-                    }
-                    button {
-                        class: "secondary-button",
-                        r#type: "button",
-                        disabled: rebuilding_hash_parts(),
-                        onclick: move |_| {
-                            rebuilding_hash_parts.set(true);
-                            message
-                                .set(
-                                    "ハッシュ検索インデックスを再構築しています…"
-                                        .to_string(),
-                                );
-                            spawn(async move {
-                                match rebuild_hash_parts().await {
-                                    Ok(count) => {
-                                        message
-                                            .set(
-                                                format!(
-                                                    "ハッシュ検索インデックスを再構築しました（{count} 件）",
-                                                ),
-                                            )
-                                    }
-                                    Err(error) => {
-                                        message.set(format!("再構築に失敗しました: {error}"))
-                                    }
-                                }
-                                rebuilding_hash_parts.set(false);
-                            });
-                        },
-                        if rebuilding_hash_parts() {
-                            "再構築中…"
-                        } else {
-                            "検索インデックスを再構築"
-                        }
                     }
                 }
             }
@@ -239,6 +194,10 @@ pub fn ServerManagement(
                                 }
                                 if let Some(current) = progress_by_server.get(&server.id).cloned() {
                                     div { class: "fetch-progress",
+                                        progress {
+                                            max: "100",
+                                            value: "{current.percent()}",
+                                        }
                                         p {
                                             if current.stage == "listing" {
                                                 "絵文字一覧を取得中…"
@@ -249,10 +208,6 @@ pub fn ServerManagement(
                                             } else {
                                                 "取得完了"
                                             }
-                                        }
-                                        progress {
-                                            max: "100",
-                                            value: "{current.percent()}",
                                         }
                                     }
                                 }

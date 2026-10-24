@@ -167,8 +167,37 @@ body {
   font-size: 1em;
 }
 
-.index-section {
-  background: #f9fafb;
+.management-collapsible {
+  border: 1px solid #d0d5dd;
+  border-radius: 0.75em;
+  background: #fff;
+}
+
+.management-collapsible > summary {
+  padding: 1em 1.75em;
+  color: #101828;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.management-collapsible[open] > summary {
+  border-bottom: 1px solid #eaecf0;
+}
+
+.management-collapsible > :not(summary) {
+  margin: 1.25em 1.75em;
+}
+
+.hash-index-rebuild {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75em;
+}
+
+.hash-index-rebuild p {
+  margin: 0;
+  color: #667085;
+  font-size: 0.9em;
 }
 
 .server-register-form {
@@ -332,8 +361,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75em;
-  padding-top: 1em;
-  border-top: 1px solid #d0d5dd;
 }
 
 .image-compare h2,
@@ -506,6 +533,36 @@ body {
   display: none;
 }
 
+.workspace-content.export-tab {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-content.export-tab[hidden] {
+  display: none;
+}
+
+.export-tab-section {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.export-tab-section > * {
+  flex: 0 0 auto;
+}
+
+.export-tab-section > .export-review-scroll {
+  flex: 1 1 auto;
+  min-height: 8em;
+  margin-bottom: 0.75em;
+  overflow: auto;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.5em;
+}
+
 .export-review-table {
   width: 100%;
   border-collapse: collapse;
@@ -525,7 +582,8 @@ body {
 
 .export-review-table th {
   position: sticky;
-  top: -1.5em;
+  top: 0;
+  z-index: 1;
   background: #f9fafb;
   color: #667085;
   font-weight: 600;
@@ -571,6 +629,14 @@ body {
 
 .export-compare-error {
   color: #b42318;
+}
+
+.export-compare-error,
+.export-message {
+  max-height: 25vh;
+  overflow: auto;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .matching-overlay {
@@ -1048,7 +1114,7 @@ body {
 }
 
 .fetch-progress p {
-  margin: 0.25em 0;
+  margin: 0.5em 0 0.25em;
 }
 
 .fetch-progress progress {

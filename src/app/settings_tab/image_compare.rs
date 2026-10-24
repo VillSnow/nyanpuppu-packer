@@ -38,7 +38,6 @@ pub fn ImageCompare() -> Element {
 
     rsx! {
         section { class: "image-compare",
-            h2 { "画像比較" }
             p {
                 "ローカルファイルまたは URL を2つ指定すると、グリッド化画像とハッシュの距離を比較します。"
             }

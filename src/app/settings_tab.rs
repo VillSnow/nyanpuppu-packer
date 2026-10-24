@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
 
+mod hash_index;
 mod image_compare;
 mod server_management;
 
 use crate::backend::{FetchProgress, Server, list_servers, subscribe_fetch_progress};
 use dioxus::prelude::*;
+use hash_index::HashIndexRebuild;
 use image_compare::ImageCompare;
 use server_management::ServerManagement;
 use std::collections::HashMap;
@@ -34,7 +36,14 @@ pub fn SettingsTab(active: bool) -> Element {
                     message: server_message,
                     progress: server_progress,
                 }
-                ImageCompare {}
+                details { class: "management-collapsible",
+                    summary { "ハッシュ検索インデックス (開発用)" }
+                    HashIndexRebuild {}
+                }
+                details { class: "management-collapsible",
+                    summary { "画像比較 (開発用)" }
+                    ImageCompare {}
+                }
             }
         }
     }
