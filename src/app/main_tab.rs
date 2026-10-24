@@ -8,10 +8,10 @@ mod matching;
 
 use std::collections::HashSet;
 
-use crate::backend::{ExportEmoji, export_emoji_package};
+use crate::backend::{EmojiMatch, ExportEmoji, export_emoji_package};
 use delete_confirmation::DeleteConfirmation;
 use dioxus::{html::u::min_width, prelude::*};
-use editing_emoji::EditingEmojis;
+use editing_emoji::{EditingEmoji, EditingEmojis};
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
 use import_emojis::import_images;
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
@@ -53,6 +53,89 @@ pub fn MainTab(active: bool) -> Element {
         if let Some(count) = pending_delete_count() {
             DeleteConfirmation { count, pending_delete_count }
         }
+    }
+}
+
+/// 一括操作の対象となるフィールド。
+#[derive(Clone, Copy, PartialEq)]
+enum BulkField {
+    Category,
+    EmojiName,
+    Aliases,
+    License,
+}
+
+impl BulkField {
+    const ALL: [BulkField; 4] = [
+        BulkField::Category,
+        BulkField::EmojiName,
+        BulkField::Aliases,
+        BulkField::License,
+    ];
+
+    fn key(self) -> &'static str {
+        match self {
+            BulkField::Category => "category",
+            BulkField::EmojiName => "emoji_name",
+            BulkField::Aliases => "aliases",
+            BulkField::License => "license",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            BulkField::Category => "カテゴリ",
+            BulkField::EmojiName => "絵文字名",
+            BulkField::Aliases => "タグ",
+            BulkField::License => "ライセンス",
+        }
+    }
+
+    fn from_key(key: &str) -> Option<BulkField> {
+        Self::ALL.into_iter().find(|field| field.key() == key)
+    }
+
+    /// 固定値を適用する。タグは置き換えず、未登録の場合のみ追加する。
+    fn apply_fixed(self, emoji: &mut EditingEmoji, value: &str) {
+        match self {
+            BulkField::Category => emoji.category = value.to_owned(),
+            BulkField::EmojiName => emoji.emoji_name = value.to_owned(),
+            BulkField::Aliases => add_alias(emoji, value),
+            BulkField::License => emoji.license = value.to_owned(),
+        }
+    }
+
+    fn clear(self, emoji: &mut EditingEmoji) {
+        match self {
+            BulkField::Category => emoji.category.clear(),
+            BulkField::EmojiName => emoji.emoji_name.clear(),
+            BulkField::Aliases => emoji.aliases.clear(),
+            BulkField::License => emoji.license.clear(),
+        }
+    }
+
+    fn apply_candidate(self, emoji: &mut EditingEmoji, candidate: &EmojiMatch) {
+        match self {
+            BulkField::Category => {
+                emoji.category = candidate.category.as_deref().unwrap_or("").trim().to_owned();
+            }
+            BulkField::EmojiName => emoji.emoji_name = candidate.name.trim().to_owned(),
+            BulkField::Aliases => {
+                for tag in &candidate.aliases {
+                    add_alias(emoji, tag);
+                }
+            }
+            BulkField::License => {
+                emoji.license = candidate.license.as_deref().unwrap_or("").trim().to_owned();
+            }
+        }
+    }
+}
+
+fn add_alias(emoji: &mut EditingEmoji, tag: &str) {
+    let tag = tag.trim();
+    if !tag.is_empty() && !emoji.aliases.iter().any(|existing| existing == tag) {
+        emoji.aliases.push(tag.to_owned());
     }
 }
 
@@ -157,6 +240,9 @@ fn SelectionActionsCard(
         .filter(|emoji| emoji.read().selected)
         .count();
     let mut exporting = use_signal(|| false);
+    let mut target_field = use_signal(|| BulkField::Category);
+    let mut fixed_value = use_signal(String::new);
+    let mut chosen_source = use_signal(String::new);
 
     let sources = {
         let mut sources = HashSet::new();
@@ -168,6 +254,13 @@ fn SelectionActionsCard(
         let mut sources = sources.into_iter().collect::<Vec<_>>();
         sources.sort();
         sources
+    };
+
+    // 選択中の候補サーバーが存在しなくなった場合は先頭のサーバーに戻す
+    let source = if sources.contains(&chosen_source()) {
+        chosen_source()
+    } else {
+        sources.first().cloned().unwrap_or_default()
     };
 
     let wires_view_box_width = 300.0f64;
@@ -206,21 +299,32 @@ fn SelectionActionsCard(
                         label {
                             span { "対象フィールド" }
                             select {
-                                option { "カテゴリ" }
-                                option { "絵文字名" }
-                                option { "タグ" }
-                                option { "ライセンス" }
+                                value: target_field().key(),
+                                onchange: move |event| {
+                                    if let Some(field) = BulkField::from_key(&event.value()) {
+                                        target_field.set(field);
+                                    }
+                                },
+                                for field in BulkField::ALL {
+                                    option { value: field.key(), "{field.label()}" }
+                                }
                             }
                         }
                         label {
                             span { "固定値" }
-                            input { r#type: "text" }
+                            input {
+                                r#type: "text",
+                                value: "{fixed_value}",
+                                oninput: move |event| fixed_value.set(event.value()),
+                            }
                         }
                         label {
                             span { "候補サーバー" }
                             select {
+                                value: "{source}",
+                                onchange: move |event| chosen_source.set(event.value()),
                                 for source in sources.iter() {
-                                    option { "{source}" }
+                                    option { value: "{source}", "{source}" }
                                 }
                             }
                         }
@@ -250,16 +354,64 @@ fn SelectionActionsCard(
                         }
                     }
                     div { class: "commands",
-                        button { r#type: "button", style: "grid-row: 1;",
+                        button {
+                            r#type: "button",
+                            style: "grid-row: 1;",
+                            disabled: selected_count == 0,
+                            onclick: move |_| {
+                                let field = target_field();
+                                let value = fixed_value();
+                                for emoji in emojis.read().iter() {
+                                    let mut emoji = *emoji;
+                                    if emoji.read().selected {
+                                        field.apply_fixed(&mut emoji.write(), &value);
+                                    }
+                                }
+                            },
                             "フィールドに固定値を一括適用する"
                         }
-                        button { r#type: "button", style: "grid-row: 2;",
+                        button {
+                            r#type: "button",
+                            style: "grid-row: 2;",
+                            disabled: selected_count == 0 || source.is_empty(),
+                            onclick: {
+                                let source = source.clone();
+                                move |_| {
+                                    let field = target_field();
+                                    for emoji in emojis.read().iter() {
+                                        let mut emoji = *emoji;
+                                        if !emoji.read().selected {
+                                            continue;
+                                        }
+                                        let candidate = emoji
+                                            .read()
+                                            .matches
+                                            .iter()
+                                            .filter(|m| m.host == source)
+                                            .min_by_key(|m| m.distance)
+                                            .cloned();
+                                        if let Some(candidate) = candidate {
+                                            field.apply_candidate(&mut emoji.write(), &candidate);
+                                        }
+                                    }
+                                }
+                            },
                             "フィールドに候補サーバーからの値を一括適用する"
                         }
                         button {
                             class: "emojis-toolbar-danger-button",
                             style: "grid-row: 3;",
                             r#type: "button",
+                            disabled: selected_count == 0,
+                            onclick: move |_| {
+                                let field = target_field();
+                                for emoji in emojis.read().iter() {
+                                    let mut emoji = *emoji;
+                                    if emoji.read().selected {
+                                        field.clear(&mut emoji.write());
+                                    }
+                                }
+                            },
                             "フィールドをクリアする"
                         }
                     }
