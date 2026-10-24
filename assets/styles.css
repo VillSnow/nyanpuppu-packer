@@ -728,8 +728,8 @@ body {
 
 .emojis-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: start;
   justify-content: space-between;
   gap: 0.75em;
   padding: 0.75em;
@@ -751,8 +751,8 @@ body {
 }
 
 .emojis-toolbar-controls {
-  display: flex;
   flex: 0 1 auto;
+  display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 0.5em;
@@ -766,7 +766,7 @@ body {
   gap: 0.5em;
 }
 
-.emojis-toolbar-fields {
+.matrix-control {
   display: flex;
   flex: 0 1 auto;
   flex-wrap: wrap;
@@ -775,7 +775,7 @@ body {
   gap: 0.5em 0.75em;
 }
 
-.emojis-toolbar-fields label {
+.matrix-control label {
   display: inline-flex;
   align-items: center;
   gap: 0.375em;
@@ -786,7 +786,7 @@ body {
   white-space: nowrap;
 }
 
-.emojis-toolbar-fields select {
+.matrix-control select {
   min-height: 2.125em;
   margin: 0;
   padding: 0 0.5em;
@@ -798,13 +798,13 @@ body {
   font-weight: 400;
 }
 
-.emojis-toolbar-fields select:focus-visible {
+.matrix-control select:focus-visible {
   outline: 0.125em solid #84caff;
   outline-offset: 0.125em;
 }
 
 .emojis-toolbar-actions button,
-.emojis-toolbar-fields button {
+.matrix-control button {
   min-height: 2.125em;
   margin: 0;
   padding: 0 0.75em;
@@ -819,18 +819,18 @@ body {
 }
 
 .emojis-toolbar-actions button:hover:not(:disabled),
-.emojis-toolbar-fields button:hover:not(:disabled) {
+.matrix-control button:hover:not(:disabled) {
   background: #f2f4f7;
 }
 
 .emojis-toolbar-actions button:disabled,
-.emojis-toolbar-fields button:disabled {
+.matrix-control button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .emojis-toolbar-actions button:focus-visible,
-.emojis-toolbar-fields button:focus-visible {
+.matrix-control button:focus-visible {
   outline: 0.125em solid #84caff;
   outline-offset: 0.125em;
 }
@@ -846,13 +846,13 @@ body {
 }
 
 .emojis-toolbar-actions .emojis-toolbar-danger-button,
-.emojis-toolbar-fields .emojis-toolbar-danger-button {
+.matrix-control .emojis-toolbar-danger-button {
   border-color: #fecdca;
   color: #b42318;
 }
 
 .emojis-toolbar-actions .emojis-toolbar-danger-button:hover:not(:disabled),
-.emojis-toolbar-fields .emojis-toolbar-danger-button:hover:not(:disabled) {
+.matrix-control .emojis-toolbar-danger-button:hover:not(:disabled) {
   background: #fef3f2;
 }
 
@@ -981,6 +981,54 @@ body {
 .fetch-progress progress {
   display: block;
   width: min(100%, 22.5em);
+}
+
+.emojis-toolbar-controls .matrix-control {
+  display: grid;
+  grid-template-columns: auto 1fr 9em auto;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.5em;
+
+  select,
+  input {
+    height: 100%;
+  }
+
+  .args {
+    display: grid;
+    grid-column: 1 / span 2;
+    grid-row: 1 / -1;
+    grid-template-columns: subgrid;
+    grid-template-rows: subgrid;
+    gap: 0.5em;
+
+    label {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: subgrid;
+    }
+  }
+
+  .wires {
+    grid-column: 3;
+    grid-row: 1 / -1;
+    align-self: stretch;
+    background: #f9fafb;
+    position: relative;
+    svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .commands {
+    grid-column: 4;
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-rows: subgrid;
+  }
 }
 
 @media (max-width: 48em) {

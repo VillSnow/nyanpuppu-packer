@@ -10,7 +10,7 @@ use std::collections::HashSet;
 
 use crate::backend::{ExportEmoji, export_emoji_package};
 use delete_confirmation::DeleteConfirmation;
-use dioxus::prelude::*;
+use dioxus::{html::u::min_width, prelude::*};
 use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
 use import_emojis::import_images;
@@ -170,36 +170,98 @@ fn SelectionActionsCard(
         sources
     };
 
+    let wires_view_box_width = 300.0f64;
+
+    let wire = |arg: i32, command: i32| -> Element {
+        let gap = 50.0;
+        let y1 = 50 + arg * 100;
+        let y2 = 50 + command * 100;
+        let theta = f64::atan2((y2 - y1) as f64, wires_view_box_width as f64);
+
+        let x1 = gap * theta.cos();
+        let x2 = wires_view_box_width - gap * theta.cos();
+        let y1 = y1 as f64 + gap * theta.sin();
+        let y2 = y2 as f64 - gap * theta.sin();
+
+        rsx! {
+            line {
+                x1: "{x1}",
+                y1: "{y1}",
+                x2: "{x2}",
+                y2: "{y2}",
+                stroke: "black",
+                marker_end: "url(#arrow)",
+                vector_effect: "non-scaling-stroke",
+            }
+        }
+    };
+
     rsx! {
         div { class: "emojis-toolbar",
             p { class: "emojis-toolbar-count", "操作対象: {selected_count} 件" }
 
             div { class: "emojis-toolbar-controls",
-                div { class: "emojis-toolbar-fields",
-                    label {
-                        span { "対象フィールド" }
-                        select {
-                            option { "カテゴリ" }
-                            option { "絵文字名" }
-                            option { "タグ" }
-                            option { "ライセンス" }
+                div { class: "matrix-control",
+                    div { class: "args",
+                        label {
+                            span { "対象フィールド" }
+                            select {
+                                option { "カテゴリ" }
+                                option { "絵文字名" }
+                                option { "タグ" }
+                                option { "ライセンス" }
+                            }
                         }
-                    }
-                    label {
-                        span { "候補サーバー" }
-                        select {
-                            for source in sources.iter() {
-                                option { "{source}" }
+                        label {
+                            span { "固定値" }
+                            input { r#type: "text" }
+                        }
+                        label {
+                            span { "候補サーバー" }
+                            select {
+                                for source in sources.iter() {
+                                    option { "{source}" }
+                                }
                             }
                         }
                     }
-                    button { r#type: "button",
-                        "フィールドに候補サーバーからの値を一括追加する"
+                    div { class: "wires",
+                        svg { view_box: "0 0 {wires_view_box_width} 300",
+                            defs {
+                                marker {
+                                    id: "arrow",
+                                    view_box: "0 0 10 10",
+                                    ref_x: "5",
+                                    ref_y: "5",
+                                    marker_width: "6",
+                                    marker_height: "6",
+                                    orient: "auto-start-reverse",
+                                    path {
+                                        d: "M 0 0 L 10 5 L 0 10 z",
+                                        fill: "black",
+                                    }
+                                }
+                            }
+                            {wire(0, 0)}
+                            {wire(0, 1)}
+                            {wire(0, 2)}
+                            {wire(1, 0)}
+                            {wire(2, 1)}
+                        }
                     }
-                    button {
-                        class: "emojis-toolbar-danger-button",
-                        r#type: "button",
-                        "フィールドをクリアする"
+                    div { class: "commands",
+                        button { r#type: "button", style: "grid-row: 1;",
+                            "フィールドに固定値を一括適用する"
+                        }
+                        button { r#type: "button", style: "grid-row: 2;",
+                            "フィールドに候補サーバーからの値を一括適用する"
+                        }
+                        button {
+                            class: "emojis-toolbar-danger-button",
+                            style: "grid-row: 3;",
+                            r#type: "button",
+                            "フィールドをクリアする"
+                        }
                     }
                 }
 
