@@ -5,16 +5,18 @@ mod editing_emoji;
 mod emojis_grid;
 mod import_emojis;
 mod matching;
+mod replace_confirmation;
 
 use std::collections::HashSet;
 
 use crate::backend::{EmojiMatch, ExportEmoji, export_emoji_package};
 use delete_confirmation::DeleteConfirmation;
-use dioxus::{html::u::min_width, prelude::*};
+use dioxus::{html::FileData, html::u::min_width, prelude::*};
 use editing_emoji::{EditingEmoji, EditingEmojis};
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
-use import_emojis::import_images;
+use import_emojis::{import_images, import_package};
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
+use replace_confirmation::ReplaceConfirmation;
 
 /// 「パッケージ作成」タブ。画像の読み込み・照合・編集・書き出しと、それに伴う状態を保持する。
 #[component]
@@ -24,6 +26,12 @@ pub fn MainTab(active: bool) -> Element {
     let matching = use_matching_state();
     let export_message = use_signal(String::new);
     let pending_delete_count = use_signal(|| None::<usize>);
+    let pending_zip = use_signal(|| None::<FileData>);
+    let import_message = use_signal(String::new);
+    // MainTab のスコープで実行させるため、確認ダイアログではなくここでコールバックを作る
+    let confirm_zip_import = use_callback(move |file: FileData| {
+        import_package(file, emojis, match_threshold, matching, import_message);
+    });
     let visibilities = use_column_visibilities();
 
     let current_emojis = emojis.read().clone();
@@ -31,7 +39,12 @@ pub fn MainTab(active: bool) -> Element {
 
     rsx! {
         div { class: "workspace-content main-tab", hidden: !active,
-            ImageAddToolbar { match_threshold, matching }
+            ImageAddToolbar {
+                match_threshold,
+                matching,
+                pending_zip,
+                import_message,
+            }
             if current_emojis.is_empty() {
                 section {
                     p { "画像を追加すると、照合結果がここに表示されます。" }
@@ -52,6 +65,9 @@ pub fn MainTab(active: bool) -> Element {
         }
         if let Some(count) = pending_delete_count() {
             DeleteConfirmation { count, pending_delete_count }
+        }
+        if pending_zip().is_some() {
+            ReplaceConfirmation { pending_zip, on_confirm: confirm_zip_import }
         }
     }
 }
@@ -154,9 +170,16 @@ fn LabeledCheckbox(label: String, mut flag: Signal<bool>) -> Element {
 }
 
 #[component]
-fn ImageAddToolbar(match_threshold: Signal<u32>, matching: MatchingState) -> Element {
+fn ImageAddToolbar(
+    match_threshold: Signal<u32>,
+    matching: MatchingState,
+    mut pending_zip: Signal<Option<FileData>>,
+    import_message: Signal<String>,
+) -> Element {
     let emojis: EditingEmojis = use_context();
     let mut threshold_change_id = use_signal(|| 0u64);
+    // 同じファイルを再度選択しても change が発火するよう、選択のたびに input を作り直す
+    let mut zip_input_key = use_signal(|| 0u64);
 
     let matched_emoji_count = emojis
         .read()
@@ -176,6 +199,26 @@ fn ImageAddToolbar(match_threshold: Signal<u32>, matching: MatchingState) -> Ele
                         accept: "image/*",
                         multiple: true,
                         onchange: move |event| import_images(event.files(), emojis, match_threshold, matching),
+                    }
+                }
+                label { class: "image-file-picker",
+                    "ZIPを読み込み"
+                    input {
+                        key: "{zip_input_key}",
+                        id: "zip-input",
+                        r#type: "file",
+                        accept: ".zip,application/zip",
+                        onchange: move |event| {
+                            let Some(file) = event.files().into_iter().next() else {
+                                return;
+                            };
+                            zip_input_key += 1;
+                            if emojis.read().is_empty() {
+                                import_package(file, emojis, match_threshold, matching, import_message);
+                            } else {
+                                pending_zip.set(Some(file));
+                            }
+                        },
                     }
                 }
             }
@@ -209,6 +252,9 @@ fn ImageAddToolbar(match_threshold: Signal<u32>, matching: MatchingState) -> Ele
             }
             p { class: "emoji-match-status",
                 "一致あり: {matched_emoji_count} / {emoji_count} 枚"
+            }
+            if !import_message.read().is_empty() {
+                p { class: "emoji-match-status", style: "white-space: pre-line;", "{import_message}" }
             }
         }
     }

@@ -89,6 +89,23 @@ pub struct ExportEmoji {
     pub image: Vec<u8>,
 }
 
+#[derive(Deserialize)]
+pub struct ImportedEmoji {
+    pub file_name: String,
+    pub emoji_name: String,
+    pub category: String,
+    pub aliases: Vec<String>,
+    pub license: String,
+    pub mime: String,
+    pub image: Vec<u8>,
+}
+
+#[derive(Deserialize)]
+pub struct ImportedPackage {
+    pub emojis: Vec<ImportedEmoji>,
+    pub warnings: Vec<String>,
+}
+
 async fn invoke<T: DeserializeOwned>(command: &str, args: JsValue) -> Result<T, String> {
     let window = web_sys::window().ok_or_else(|| "アプリに接続できません".to_string())?;
     let tauri = Reflect::get(&window, &"__TAURI__".into()).map_err(|e| format!("{e:?}"))?;
@@ -229,6 +246,12 @@ pub async fn match_hash(hash: String, threshold: u32) -> Result<Vec<EmojiMatch>,
         &JsValue::from_f64(threshold as f64),
     );
     invoke("match_hash", args.into()).await
+}
+
+pub async fn import_emoji_package(archive: Vec<u8>) -> Result<ImportedPackage, String> {
+    let args = Object::new();
+    let _ = Reflect::set(&args, &"archive".into(), &bytes_to_js(&archive));
+    invoke("import_emoji_package", args.into()).await
 }
 
 pub async fn export_emoji_package(

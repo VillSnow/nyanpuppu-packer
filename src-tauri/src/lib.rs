@@ -1,6 +1,7 @@
 mod database;
 mod export;
 mod image_hash;
+mod import;
 
 use database::{add_server, list_servers, remove_server};
 use futures_util::{StreamExt, stream};
@@ -66,6 +67,18 @@ async fn export_emoji_package(
         path: path.display().to_string(),
         emoji_count,
     }))
+}
+
+/// 絵文字パッケージ (ZIP) の内容を読み込む。
+#[tauri::command]
+async fn import_emoji_package(archive: Vec<u8>) -> Result<import::ImportedPackage, String> {
+    tauri::async_runtime::spawn_blocking(move || import::read_package(archive))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| {
+            tracing::error!(error = %e, "絵文字パッケージの読み込みに失敗しました");
+            format!("ZIP を読み込めませんでした: {e:#}")
+        })
 }
 
 #[derive(Serialize)]
@@ -675,6 +688,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             export_emoji_package,
+            import_emoji_package,
             list_servers,
             database::rebuild_hash_parts,
             add_server,
