@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
-use dioxus::{html::FileData, html::u::min_width, prelude::*};
+use dioxus::{html::FileData, prelude::*};
 use editing_emoji::EditingEmoji;
 pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
