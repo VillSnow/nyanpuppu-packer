@@ -79,7 +79,7 @@ pub fn EmojisGrid(visibilities: ColumnVisibilities) -> Element {
     let grid_template_columns = {
         fn track(name: &str, vis: bool) -> String {
             if vis {
-                format!("[{name}] fit-content(50%)")
+                format!("[{name}] auto")
             } else {
                 format!("[{name}] 0")
             }
