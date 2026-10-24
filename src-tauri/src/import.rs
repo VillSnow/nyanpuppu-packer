@@ -83,7 +83,10 @@ pub fn read_package(archive: Vec<u8>) -> Result<ImportedPackage> {
         let image = match read_entry(&mut archive, &entry.file_name, MAX_IMAGE_SIZE) {
             Ok(image) => image,
             Err(error) => {
-                warnings.push(format!("{label}: {} を読み込めません ({error})", entry.file_name));
+                warnings.push(format!(
+                    "{label}: {} を読み込めません ({error})",
+                    entry.file_name
+                ));
                 continue;
             }
         };

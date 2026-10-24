@@ -20,5 +20,5 @@ pub struct EditingEmoji {
 
 pub enum EditingEmojisTag {}
 
-/// 編集中の絵文字リストを MainTab 配下で共有するコンテキスト。
+/// 編集中の絵文字リストを 編集・書き出しタブ間で共有するコンテキスト。
 pub type EditingEmojis = Ctx<Vec<dioxus::signals::Signal<EditingEmoji>>, EditingEmojisTag>;

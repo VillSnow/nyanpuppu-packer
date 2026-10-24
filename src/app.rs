@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
 
-mod main_tab;
+mod edit_tab;
+mod export_tab;
 mod settings_tab;
 
 use dioxus::prelude::*;
-use main_tab::MainTab;
+use edit_tab::{EditTab, EditingEmojis};
+use export_tab::ExportTab;
 use settings_tab::SettingsTab;
 
 static CSS: Asset = asset!("/assets/styles.css");
@@ -12,13 +14,15 @@ static EMOJIS_GRID_CSS: Asset = asset!("/assets/emojis-grid.css");
 
 #[derive(Clone, Copy, PartialEq)]
 enum Tab {
-    Main,
+    Edit,
+    Export,
     Settings,
 }
 
-/// タブの切り替えのみを担当する。各タブは常にマウントされ、自身の状態を保持する。
+/// タブの切り替えと、タブ間で共有する編集中の絵文字リストの提供を担当する。各タブは常にマウントされ、自身の状態を保持する。
 pub fn App() -> Element {
-    let mut current_tab = use_signal(|| Tab::Main);
+    let mut current_tab = use_signal(|| Tab::Edit);
+    use_context_provider(|| EditingEmojis::new(Vec::new()));
 
     rsx! {
         link { rel: "stylesheet", href: CSS }
@@ -27,8 +31,14 @@ pub fn App() -> Element {
         div { class: "app-shell",
             nav { class: "tab-bar", aria_label: "ページ",
                 TabButton {
-                    label: "パッケージ作成",
-                    tab: Tab::Main,
+                    label: "編集",
+                    tab: Tab::Edit,
+                    current_tab: current_tab(),
+                    onselect: move |tab| current_tab.set(tab),
+                }
+                TabButton {
+                    label: "書き出し",
+                    tab: Tab::Export,
                     current_tab: current_tab(),
                     onselect: move |tab| current_tab.set(tab),
                 }
@@ -40,7 +50,8 @@ pub fn App() -> Element {
                 }
             }
             main { class: "workspace",
-                MainTab { active: current_tab() == Tab::Main }
+                EditTab { active: current_tab() == Tab::Edit }
+                ExportTab { active: current_tab() == Tab::Export }
                 SettingsTab { active: current_tab() == Tab::Settings }
             }
         }

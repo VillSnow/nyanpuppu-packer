@@ -276,7 +276,7 @@ fn ComparisonFrames(
 ) -> Element {
     rsx! {
         div { class: "{class}",
-            for (index , frame) in frames.iter().enumerate() {
+            for (index, frame) in frames.iter().enumerate() {
                 figure { key: "{index}",
                     img {
                         src: "data:image/png;base64,{frame}",

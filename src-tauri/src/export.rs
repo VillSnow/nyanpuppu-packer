@@ -55,10 +55,7 @@ struct PackageEmojiInfo<'a> {
 }
 
 fn is_valid_emoji_name(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 fn image_extension(image: &[u8]) -> Option<&'static str> {
@@ -201,10 +198,16 @@ mod tests {
         let archive = build_package(&prepared).unwrap();
         let mut zip = zip::ZipArchive::new(Cursor::new(archive)).unwrap();
         let mut meta = String::new();
-        zip.by_name("meta.json").unwrap().read_to_string(&mut meta).unwrap();
+        zip.by_name("meta.json")
+            .unwrap()
+            .read_to_string(&mut meta)
+            .unwrap();
         let meta: serde_json::Value = serde_json::from_str(&meta).unwrap();
         assert_eq!(meta["emojis"][0]["fileName"], "nyan.png");
-        assert_eq!(meta["emojis"][0]["emoji"]["aliases"], serde_json::json!(["neko"]));
+        assert_eq!(
+            meta["emojis"][0]["emoji"]["aliases"],
+            serde_json::json!(["neko"])
+        );
         assert_eq!(meta["emojis"][0]["emoji"]["category"], "Cat");
         assert_eq!(meta["emojis"][0]["emoji"]["license"], "CC0");
         assert!(zip.by_name("nyan.png").is_ok());

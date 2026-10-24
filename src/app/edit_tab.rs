@@ -9,26 +9,27 @@ mod replace_confirmation;
 
 use std::collections::HashSet;
 
-use crate::backend::{EmojiMatch, ExportEmoji, export_emoji_package};
+use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
 use dioxus::{html::FileData, html::u::min_width, prelude::*};
-use editing_emoji::{EditingEmoji, EditingEmojis};
+use editing_emoji::EditingEmoji;
+pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
 use import_emojis::{import_images, import_package};
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
 use replace_confirmation::ReplaceConfirmation;
 
-/// 「パッケージ作成」タブ。画像の読み込み・照合・編集・書き出しと、それに伴う状態を保持する。
+/// 「編集」タブ。画像の読み込み・照合・編集と、それに伴う状態を保持する。
+/// 編集中の絵文字リストは書き出しタブと共有するため、コンテキストは App が提供する。
 #[component]
-pub fn MainTab(active: bool) -> Element {
-    let emojis = use_context_provider(|| EditingEmojis::new(Vec::new()));
+pub fn EditTab(active: bool) -> Element {
+    let emojis: EditingEmojis = use_context();
     let match_threshold = use_signal(|| 10u32);
     let matching = use_matching_state();
-    let export_message = use_signal(String::new);
     let pending_delete_count = use_signal(|| None::<usize>);
     let pending_zip = use_signal(|| None::<FileData>);
     let import_message = use_signal(String::new);
-    // MainTab のスコープで実行させるため、確認ダイアログではなくここでコールバックを作る
+    // EditTab のスコープで実行させるため、確認ダイアログではなくここでコールバックを作る
     let confirm_zip_import = use_callback(move |file: FileData| {
         import_package(file, emojis, match_threshold, matching, import_message);
     });
@@ -38,7 +39,7 @@ pub fn MainTab(active: bool) -> Element {
     let current_matching_progress = (matching.progress)();
 
     rsx! {
-        div { class: "workspace-content main-tab", hidden: !active,
+        div { class: "workspace-content edit-tab", hidden: !active,
             ImageAddToolbar {
                 match_threshold,
                 matching,
@@ -51,11 +52,7 @@ pub fn MainTab(active: bool) -> Element {
                 }
             } else {
                 section { class: "emojis-section",
-                    EmojisToolbar {
-                        export_message,
-                        pending_delete_count,
-                        visibilities,
-                    }
+                    EmojisToolbar { pending_delete_count, visibilities }
                     EmojisGrid { visibilities }
                 }
             }
@@ -133,7 +130,12 @@ impl BulkField {
     fn apply_candidate(self, emoji: &mut EditingEmoji, candidate: &EmojiMatch) {
         match self {
             BulkField::Category => {
-                emoji.category = candidate.category.as_deref().unwrap_or("").trim().to_owned();
+                emoji.category = candidate
+                    .category
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .to_owned();
             }
             BulkField::EmojiName => emoji.emoji_name = candidate.name.trim().to_owned(),
             BulkField::Aliases => {
@@ -254,7 +256,11 @@ fn ImageAddToolbar(
                 "一致あり: {matched_emoji_count} / {emoji_count} 枚"
             }
             if !import_message.read().is_empty() {
-                p { class: "emoji-match-status", style: "white-space: pre-line;", "{import_message}" }
+                p {
+                    class: "emoji-match-status",
+                    style: "white-space: pre-line;",
+                    "{import_message}"
+                }
             }
         }
     }
@@ -262,30 +268,25 @@ fn ImageAddToolbar(
 
 #[component]
 fn EmojisToolbar(
-    export_message: Signal<String>,
     pending_delete_count: Signal<Option<usize>>,
     visibilities: ColumnVisibilities,
 ) -> Element {
     rsx! {
         div { class: "emojis-toolbars",
-            SelectionActionsCard { export_message, pending_delete_count }
+            SelectionActionsCard { pending_delete_count }
             ColumnVisibilityCard { visibilities }
         }
     }
 }
 
 #[component]
-fn SelectionActionsCard(
-    mut export_message: Signal<String>,
-    mut pending_delete_count: Signal<Option<usize>>,
-) -> Element {
+fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Element {
     let emojis: EditingEmojis = use_context();
     let selected_count = emojis
         .read()
         .iter()
         .filter(|emoji| emoji.read().selected)
         .count();
-    let mut exporting = use_signal(|| false);
     let mut target_field = use_signal(|| BulkField::Category);
     let mut fixed_value = use_signal(String::new);
     let mut chosen_source = use_signal(String::new);
@@ -465,46 +466,6 @@ fn SelectionActionsCard(
 
                 div { class: "emojis-toolbar-actions",
                     button {
-                        class: "emojis-toolbar-export-button",
-                        r#type: "button",
-                        disabled: selected_count == 0 || exporting(),
-                        onclick: move |_| {
-                            let export_emojis = emojis
-                                .read()
-                                .iter()
-                                .filter(|emoji| emoji.read().selected)
-                                .map(|emoji| ExportEmoji {
-                                    file_name: emoji.read().file_name.clone(),
-                                    emoji_name: emoji.read().emoji_name.clone(),
-                                    category: emoji.read().category.clone(),
-                                    aliases: emoji.read().aliases.clone(),
-                                    license: emoji.read().license.clone(),
-                                    image: emoji.read().bytes.as_ref().clone(),
-                                })
-                                .collect::<Vec<_>>();
-                            exporting.set(true);
-                            export_message.set("書き出しています…".to_string());
-                            spawn(async move {
-                                match export_emoji_package(export_emojis).await {
-                                    Ok(Some(summary)) => {
-                                        export_message
-                                            .set(
-                                                format!(
-                                                    "{} 件を書き出しました: {}",
-                                                    summary.emoji_count,
-                                                    summary.path,
-                                                ),
-                                            )
-                                    }
-                                    Ok(None) => export_message.set(String::new()),
-                                    Err(error) => export_message.set(error),
-                                }
-                                exporting.set(false);
-                            });
-                        },
-                        "書き出し"
-                    }
-                    button {
                         class: "emojis-toolbar-danger-button",
                         r#type: "button",
                         disabled: selected_count == 0,
@@ -512,9 +473,6 @@ fn SelectionActionsCard(
                         "除去"
                     }
                 }
-            }
-            if !export_message.read().is_empty() {
-                p { style: "white-space: pre-line;", "{export_message}" }
             }
         }
     }

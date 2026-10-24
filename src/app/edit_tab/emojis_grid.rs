@@ -481,7 +481,7 @@ fn candidate_buttons(
     rsx! {
         div { class: "cell", style: "grid-column: {column}", hidden: !vis,
             div { class: "v-stack-start sticky-item",
-                for (key , ms) in groups {
+                for (key, ms) in groups {
                     div {
                         class: "candidate-group",
                         style: "height: calc(var(--organelle-unit) * {ms.len()});",
@@ -513,7 +513,7 @@ fn source_host_labels(column: &str, vis: bool, groups: &Vec<(String, Vec<EmojiMa
     rsx! {
         div { class: "cell", style: "grid-column: {column}", hidden: !vis,
             div { class: "v-stack-start sticky-item",
-                for (_ , ms) in groups {
+                for (_, ms) in groups {
                     div { class: "candidate-group",
                         for m in ms {
                             div { class: "organelle",

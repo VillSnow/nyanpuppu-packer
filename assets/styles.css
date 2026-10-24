@@ -1,4 +1,4 @@
-/* App layout and image matching grid. */
+﻿/* App layout and image matching grid. */
 * {
   box-sizing: border-box;
 }
@@ -490,7 +490,7 @@ body {
   }
 }
 
-.workspace-content.main-tab {
+.workspace-content.edit-tab {
   display: flex;
   flex-direction: column;
   overflow: hidden;
