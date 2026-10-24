@@ -3,7 +3,7 @@
 mod delete_confirmation;
 mod editing_emoji;
 mod emojis_grid;
-mod image_import;
+mod import_emojis;
 mod matching;
 
 use crate::backend::{ExportEmoji, export_emoji_package};
@@ -11,7 +11,7 @@ use delete_confirmation::DeleteConfirmation;
 use dioxus::prelude::*;
 use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
-use image_import::import_images;
+use import_emojis::import_images;
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
 
 /// 「パッケージ作成」タブ。画像の読み込み・照合・編集・書き出しと、それに伴う状態を保持する。

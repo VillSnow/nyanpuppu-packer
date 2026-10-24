@@ -77,7 +77,7 @@ const LICENSE_SOURCE: &str = "license_source";
 pub fn EmojisGrid(visibilities: ColumnVisibilities) -> Element {
     let emojis: EditingEmojis = use_context();
     let grid_template_columns = {
-        fn track(name: &str, value: &str, vis: bool) -> String {
+        fn track(name: &str, vis: bool) -> String {
             if vis {
                 format!("[{name}] fit-content(50%)")
             } else {
@@ -86,71 +86,47 @@ pub fn EmojisGrid(visibilities: ColumnVisibilities) -> Element {
         }
         [
             // チェックボックスとプレビュー画像
-            track(CHK_AND_PREVIEW, "max-content", true),
+            track(CHK_AND_PREVIEW, true),
             // ファイル名
-            track(
-                FILE_NAME,
-                "minmax(max-content, auto)",
-                (visibilities.file_name)(),
-            ),
+            track(FILE_NAME, (visibilities.file_name)()),
             // カテゴリ
-            track(
-                CATEGORY_FIELDS,
-                "minmax(max-content, auto)",
-                (visibilities.category_fields)(),
-            ),
+            track(CATEGORY_FIELDS, (visibilities.category_fields)()),
             track(
                 CATEGORY_CANDIDATE,
-                "minmax(max-content, auto)",
                 (visibilities.category_fields)() && (visibilities.candidates)(),
             ),
             track(
                 CATEGORY_SOURCE,
-                "minmax(max-content, auto)",
                 (visibilities.category_fields)() && (visibilities.candidates)(),
             ),
             // 絵文字名
-            track(
-                EMOJI_NAME_FIELDS,
-                "minmax(max-content, auto)",
-                (visibilities.emoji_name_fields)(),
-            ),
+            track(EMOJI_NAME_FIELDS, (visibilities.emoji_name_fields)()),
             track(
                 EMOJI_NAME_CANDIDATE,
-                "minmax(max-content, auto)",
                 (visibilities.emoji_name_fields)() && (visibilities.candidates)(),
             ),
             track(
                 EMOJI_NAME_SOURCE,
-                "minmax(max-content, auto)",
                 (visibilities.emoji_name_fields)() && (visibilities.candidates)(),
             ),
             // タグ
-            track(
-                ALIAS_FIELDS,
-                "minmax(max-content, auto)",
-                (visibilities.alias_fields)(),
-            ),
+            track(ALIAS_FIELDS, (visibilities.alias_fields)()),
             track(
                 ALIAS_CANDIDATE,
-                "fit-content(50%)",
                 (visibilities.alias_fields)() && (visibilities.candidates)(),
             ),
             track(
                 ALIAS_SOURCE,
-                "minmax(max-content, auto)",
                 (visibilities.alias_fields)() && (visibilities.candidates)(),
             ),
             // ライセンス
-            track(LICENSE_FIELDS, "auto", (visibilities.license_fields)()),
+            track(LICENSE_FIELDS, (visibilities.license_fields)()),
             track(
                 LICENSE_CANDIDATE,
-                "minmax(max-content, auto)",
                 (visibilities.license_fields)() && (visibilities.candidates)(),
             ),
             track(
                 LICENSE_SOURCE,
-                "minmax(max-content, auto)",
                 (visibilities.license_fields)() && (visibilities.candidates)(),
             ),
         ]
