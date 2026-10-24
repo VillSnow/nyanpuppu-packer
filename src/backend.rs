@@ -14,6 +14,18 @@ pub struct Server {
     pub emoji_count: i64,
     pub last_fetched_at: Option<String>,
     pub favorite: bool,
+    pub name: Option<String>,
+    pub short_name: Option<String>,
+}
+
+impl Server {
+    /// サーバーの表示名（short_name、name、URL の優先順）
+    pub fn display_name(&self) -> &str {
+        self.short_name
+            .as_deref()
+            .or(self.name.as_deref())
+            .unwrap_or(&self.url)
+    }
 }
 
 #[derive(Clone, Deserialize, PartialEq)]
@@ -23,6 +35,7 @@ pub struct EmojiMatch {
     pub aliases: Vec<String>,
     pub license: Option<String>,
     pub host: String,
+    pub host_label: String,
     pub distance: u32,
 }
 

@@ -14,6 +14,8 @@ pub struct Server {
     emoji_count: i64,
     last_fetched_at: Option<String>,
     favorite: bool,
+    name: Option<String>,
+    short_name: Option<String>,
 }
 
 pub struct EmojiRecord {
@@ -42,6 +44,7 @@ pub struct EmojiMatch {
     pub aliases: Vec<String>,
     pub license: Option<String>,
     pub host: String,
+    pub host_label: String,
     pub distance: u32,
 }
 
@@ -75,11 +78,13 @@ pub fn find_emoji_matches(
         .join(", ");
     let sql = format!(
         "with query_parts(position, part) as (values {values})
-         select e.host, e.hash, e.name, e.category, e.aliases, e.license
+         select e.host, e.hash, e.name, e.category, e.aliases, e.license,
+                coalesce(s.short_name, s.name, e.host)
          from query_parts q join hash_parts hp on hp.position = q.position and hp.part = q.part
          join emojis e on e.hash = hp.hash
+         left join servers s on s.url = e.host
          where length(e.hash) = ?
-         group by e.host, e.hash, e.name, e.category, e.aliases, e.license
+         group by e.host, e.hash, e.name, e.category, e.aliases, e.license, s.short_name, s.name
          having count(distinct hp.position) >= ?"
     );
     let mut params = Vec::with_capacity(parts.len() * 2 + 2);
@@ -102,6 +107,7 @@ pub fn find_emoji_matches(
                 row.get::<_, Option<String>>(3)?,
                 serde_json::from_str::<Vec<String>>(&aliases_json).unwrap_or_default(),
                 row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
             ))
         })
         .map_err(|e| e.to_string())?
@@ -109,7 +115,7 @@ pub fn find_emoji_matches(
         .map_err(|e| e.to_string())?;
 
     let mut best_by_name: HashMap<(String, String), EmojiMatch> = HashMap::new();
-    for (host, candidate_hash, name, category, mut aliases, license) in candidates {
+    for (host, candidate_hash, name, category, mut aliases, license, host_label) in candidates {
         if name.trim().is_empty() {
             continue;
         }
@@ -124,6 +130,7 @@ pub fn find_emoji_matches(
                 aliases,
                 license,
                 host,
+                host_label,
                 distance,
             };
             if best_by_name
@@ -166,6 +173,8 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
         "favorite",
         "integer not null default 0",
     )?;
+    ensure_column(&connection, "servers", "name", "text")?;
+    ensure_column(&connection, "servers", "short_name", "text")?;
     Ok(connection)
 }
 
@@ -312,9 +321,13 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
     let connection = open_database(&app)?;
     let mut statement = connection
         .prepare(
-            "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite
+            "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite, s.name, s.short_name
          from servers s left join emojis e on e.host = s.url
-         group by s.id order by s.favorite desc, s.url",
+         group by s.id
+         order by s.favorite desc,
+                  coalesce(s.short_name, s.name) is null,
+                  coalesce(s.short_name, s.name),
+                  s.url",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
@@ -325,6 +338,8 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
                 emoji_count: row.get(2)?,
                 last_fetched_at: row.get(3)?,
                 favorite: row.get(4)?,
+                name: row.get(5)?,
+                short_name: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -333,11 +348,7 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
 }
 
 #[tauri::command]
-pub fn set_server_favorite(
-    app: tauri::AppHandle,
-    id: i64,
-    favorite: bool,
-) -> Result<bool, String> {
+pub fn set_server_favorite(app: tauri::AppHandle, id: i64, favorite: bool) -> Result<bool, String> {
     open_database(&app)?
         .execute(
             "update servers set favorite = ?1 where id = ?2",
@@ -357,10 +368,7 @@ pub struct ServerEmoji {
 }
 
 #[tauri::command]
-pub fn list_server_emojis(
-    app: tauri::AppHandle,
-    host: String,
-) -> Result<Vec<ServerEmoji>, String> {
+pub fn list_server_emojis(app: tauri::AppHandle, host: String) -> Result<Vec<ServerEmoji>, String> {
     let connection = open_database(&app)?;
     let mut statement = connection
         .prepare(
@@ -389,7 +397,7 @@ pub fn list_server_emojis(
 }
 
 #[tauri::command]
-pub fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, String> {
+pub async fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, String> {
     let url = url.trim().trim_end_matches('/').to_string();
     let parsed =
         url::Url::parse(&url).map_err(|_| "有効なサーバーURLを入力してください".to_string())?;
@@ -400,8 +408,24 @@ pub fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, String> {
     {
         return Err("http または https のサーバーURLを入力してください".to_string());
     }
+
+    let client = metol::Client::with_endpoints(url.clone(), String::new(), None)
+        .configure_http_api_backoff(8, std::time::Duration::from_secs(1), 2);
+
+    let meta = client
+        .meta()
+        .await
+        .map_err(|_| "サーバーのメタ情報を取得できません".to_string())?;
+
     open_database(&app)?
-        .execute("insert into servers (url) values (?1)", params![url])
+        .execute(
+            "insert into servers (url, name, short_name) values (?1, ?2, ?3)",
+            params![
+                url,
+                normalize_meta_text(meta.lite.name),
+                normalize_meta_text(meta.lite.short_name)
+            ],
+        )
         .map(|_| true)
         .map_err(|error| {
             if error.to_string().contains("UNIQUE constraint failed") {
@@ -410,6 +434,41 @@ pub fn add_server(app: tauri::AppHandle, url: String) -> Result<bool, String> {
                 error.to_string()
             }
         })
+}
+
+fn normalize_meta_text(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+/// サーバーのメタ情報（name / short_name）が保存済みの値と異なる場合だけ更新し、更新したかどうかを返す。
+pub fn update_server_meta(
+    app: &tauri::AppHandle,
+    id: i64,
+    name: Option<String>,
+    short_name: Option<String>,
+) -> Result<bool, String> {
+    let name = normalize_meta_text(name);
+    let short_name = normalize_meta_text(short_name);
+    let connection = open_database(app)?;
+    let (current_name, current_short_name): (Option<String>, Option<String>) = connection
+        .query_row(
+            "select name, short_name from servers where id = ?1",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| "登録済みサーバーが見つかりません".to_string())?;
+    if current_name == name && current_short_name == short_name {
+        return Ok(false);
+    }
+    connection
+        .execute(
+            "update servers set name = ?1, short_name = ?2 where id = ?3",
+            params![name, short_name, id],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(true)
 }
 
 #[tauri::command]

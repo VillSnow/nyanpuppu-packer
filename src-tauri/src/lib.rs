@@ -283,6 +283,24 @@ async fn fetch_server_emojis(app: tauri::AppHandle, id: i64) -> Result<FetchSumm
     let client = metol::Client::with_endpoints(server_url.clone(), String::new(), None)
         .configure_http_api_backoff(8, std::time::Duration::from_secs(1), 2);
 
+    match client.meta().await {
+        Ok(meta) => {
+            match database::update_server_meta(&app, id, meta.lite.name, meta.lite.short_name) {
+                Ok(true) => tracing::info!(
+                    server_id = id,
+                    "サーバーのメタ情報が変更されていたため更新しました"
+                ),
+                Ok(false) => tracing::info!(server_id = id, "サーバーのメタ情報に変更はありません"),
+                Err(error) => {
+                    tracing::warn!(server_id = id, %error, "サーバーのメタ情報を保存できませんでした")
+                }
+            }
+        }
+        Err(error) => {
+            tracing::warn!(server_id = id, %error, "サーバーのメタ情報を取得できませんでした")
+        }
+    }
+
     let response = client
         .get_emojis(metol::mi_api_types::emojis::Request::default())
         .await

@@ -131,8 +131,16 @@ pub fn ServerManagement(
                         for server in server_list.clone() {
                             li { class: "server-list-item", key: "{server.id}",
                                 div { class: "server-details",
-                                    strong { class: "server-url", "{server.url}" }
+                                    strong { class: "server-url", "{server.display_name()}" }
                                     div { class: "server-meta",
+                                        if server.display_name() != server.url {
+                                            span { "{server.url}" }
+                                        }
+                                        if let Some(name) = &server.name {
+                                            if name != server.display_name() {
+                                                span { "名前: {name}" }
+                                            }
+                                        }
                                         span { "絵文字 {server.emoji_count} 件" }
                                         if let Some(fetched_at) = &server.last_fetched_at {
                                             span { "最終取得: {fetched_at} UTC" }

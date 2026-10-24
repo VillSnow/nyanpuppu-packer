@@ -7,7 +7,7 @@ mod import_emojis;
 mod matching;
 mod replace_confirmation;
 
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 
 use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
@@ -292,22 +292,23 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
     let mut chosen_source = use_signal(String::new);
 
     let sources = {
-        let mut sources = HashSet::new();
+        let mut sources = BTreeMap::new();
         for emoji in emojis.read().iter() {
             for m in &emoji.read().matches {
-                sources.insert(m.host.clone());
+                sources.insert(m.host.clone(), m.host_label.clone());
             }
         }
-        let mut sources = sources.into_iter().collect::<Vec<_>>();
-        sources.sort();
-        sources
+        sources.into_iter().collect::<Vec<_>>()
     };
 
     // 選択中の候補サーバーが存在しなくなった場合は先頭のサーバーに戻す
-    let source = if sources.contains(&chosen_source()) {
+    let source = if sources.iter().any(|(host, _)| *host == chosen_source()) {
         chosen_source()
     } else {
-        sources.first().cloned().unwrap_or_default()
+        sources
+            .first()
+            .map(|(host, _)| host.clone())
+            .unwrap_or_default()
     };
 
     let wires_view_box_width = 300.0f64;
@@ -370,8 +371,8 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                             select {
                                 value: "{source}",
                                 onchange: move |event| chosen_source.set(event.value()),
-                                for source in sources.iter() {
-                                    option { value: "{source}", "{source}" }
+                                for (host, label) in sources.iter() {
+                                    option { value: "{host}", "{label}" }
                                 }
                             }
                         }

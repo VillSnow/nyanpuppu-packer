@@ -517,7 +517,7 @@ fn source_host_labels(column: &str, vis: bool, groups: &Vec<(String, Vec<EmojiMa
                     div { class: "candidate-group",
                         for m in ms {
                             div { class: "organelle",
-                                span { "{m.host}" }
+                                span { "{m.host_label}" }
                             }
                         }
                     }

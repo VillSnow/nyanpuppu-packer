@@ -355,7 +355,7 @@ pub fn ExportTab(active: bool) -> Element {
                         onchange: move |event| compare_host.set(event.value()),
                         option { value: "", "比較しない" }
                         for server in servers.read().iter() {
-                            option { value: "{server.url}", "{server.url}" }
+                            option { value: "{server.url}", "{server.display_name()}" }
                         }
                     }
                 }
