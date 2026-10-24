@@ -728,6 +728,7 @@ body {
 
 .emojis-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75em;
@@ -744,15 +745,65 @@ body {
   font-weight: 600;
 }
 
-.emojis-toolbar-actions {
+.emojis-toolbar .emojis-toolbar-count {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
+.emojis-toolbar-controls {
   display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5em;
+}
+
+.emojis-toolbar-actions {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5em;
 }
 
-.emojis-toolbar-actions button {
+.emojis-toolbar-fields {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5em 0.75em;
+}
+
+.emojis-toolbar-fields label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375em;
+  margin: 0;
+  color: #344054;
+  font-size: 0.875em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.emojis-toolbar-fields select {
+  min-height: 2.125em;
+  margin: 0;
+  padding: 0 0.5em;
+  border: 1px solid #98a2b3;
+  border-radius: 0.375em;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-weight: 400;
+}
+
+.emojis-toolbar-fields select:focus-visible {
+  outline: 0.125em solid #84caff;
+  outline-offset: 0.125em;
+}
+
+.emojis-toolbar-actions button,
+.emojis-toolbar-fields button {
   min-height: 2.125em;
   margin: 0;
   padding: 0 0.75em;
@@ -762,19 +813,23 @@ body {
   color: #344054;
   font: inherit;
   font-size: 0.875em;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.emojis-toolbar-actions button:hover:not(:disabled) {
+.emojis-toolbar-actions button:hover:not(:disabled),
+.emojis-toolbar-fields button:hover:not(:disabled) {
   background: #f2f4f7;
 }
 
-.emojis-toolbar-actions button:disabled {
+.emojis-toolbar-actions button:disabled,
+.emojis-toolbar-fields button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.emojis-toolbar-actions button:focus-visible {
+.emojis-toolbar-actions button:focus-visible,
+.emojis-toolbar-fields button:focus-visible {
   outline: 0.125em solid #84caff;
   outline-offset: 0.125em;
 }
@@ -789,12 +844,14 @@ body {
   background: #1d2939;
 }
 
-.emojis-toolbar-actions .emojis-toolbar-danger-button {
+.emojis-toolbar-actions .emojis-toolbar-danger-button,
+.emojis-toolbar-fields .emojis-toolbar-danger-button {
   border-color: #fecdca;
   color: #b42318;
 }
 
-.emojis-toolbar-actions .emojis-toolbar-danger-button:hover:not(:disabled) {
+.emojis-toolbar-actions .emojis-toolbar-danger-button:hover:not(:disabled),
+.emojis-toolbar-fields .emojis-toolbar-danger-button:hover:not(:disabled) {
   background: #fef3f2;
 }
 
@@ -942,15 +999,6 @@ body {
   .emoji-match-status {
     align-self: flex-start;
     margin-left: 0;
-  }
-
-  .emojis-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .emojis-toolbar-actions {
-    justify-content: flex-start;
   }
 
   .management-card-header,

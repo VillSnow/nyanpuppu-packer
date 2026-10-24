@@ -6,6 +6,8 @@ mod emojis_grid;
 mod import_emojis;
 mod matching;
 
+use std::collections::HashSet;
+
 use crate::backend::{ExportEmoji, export_emoji_package};
 use delete_confirmation::DeleteConfirmation;
 use dioxus::prelude::*;
@@ -156,56 +158,99 @@ fn SelectionActionsCard(
         .count();
     let mut exporting = use_signal(|| false);
 
+    let sources = {
+        let mut sources = HashSet::new();
+        for emoji in emojis.read().iter() {
+            for m in &emoji.read().matches {
+                sources.insert(m.host.clone());
+            }
+        }
+        let mut sources = sources.into_iter().collect::<Vec<_>>();
+        sources.sort();
+        sources
+    };
+
     rsx! {
         div { class: "emojis-toolbar",
-            p { "選択中: {selected_count} 件" }
-            div { class: "emojis-toolbar-actions",
-                button {
-                    class: "emojis-toolbar-danger-button",
-                    r#type: "button",
-                    disabled: selected_count == 0,
-                    onclick: move |_| pending_delete_count.set(Some(selected_count)),
-                    "選択中の画像を削除"
-                }
-                button {
-                    class: "emojis-toolbar-export-button",
-                    r#type: "button",
-                    disabled: selected_count == 0 || exporting(),
-                    onclick: move |_| {
-                        let export_emojis = emojis
-                            .read()
-                            .iter()
-                            .filter(|emoji| emoji.read().selected)
-                            .map(|emoji| ExportEmoji {
-                                file_name: emoji.read().file_name.clone(),
-                                emoji_name: emoji.read().emoji_name.clone(),
-                                category: emoji.read().category.clone(),
-                                aliases: emoji.read().aliases.clone(),
-                                license: emoji.read().license.clone(),
-                                image: emoji.read().bytes.as_ref().clone(),
-                            })
-                            .collect::<Vec<_>>();
-                        exporting.set(true);
-                        export_message.set("書き出しています…".to_string());
-                        spawn(async move {
-                            match export_emoji_package(export_emojis).await {
-                                Ok(Some(summary)) => {
-                                    export_message
-                                        .set(
-                                            format!(
-                                                "{} 件を書き出しました: {}",
-                                                summary.emoji_count,
-                                                summary.path,
-                                            ),
-                                        )
-                                }
-                                Ok(None) => export_message.set(String::new()),
-                                Err(error) => export_message.set(error),
+            p { class: "emojis-toolbar-count", "操作対象: {selected_count} 件" }
+
+            div { class: "emojis-toolbar-controls",
+                div { class: "emojis-toolbar-fields",
+                    label {
+                        span { "対象フィールド" }
+                        select {
+                            option { "カテゴリ" }
+                            option { "絵文字名" }
+                            option { "タグ" }
+                            option { "ライセンス" }
+                        }
+                    }
+                    label {
+                        span { "候補サーバー" }
+                        select {
+                            for source in sources.iter() {
+                                option { "{source}" }
                             }
-                            exporting.set(false);
-                        });
-                    },
-                    "選択中の画像を書き出し"
+                        }
+                    }
+                    button { r#type: "button",
+                        "フィールドに候補サーバーからの値を一括追加する"
+                    }
+                    button {
+                        class: "emojis-toolbar-danger-button",
+                        r#type: "button",
+                        "フィールドをクリアする"
+                    }
+                }
+
+                div { class: "emojis-toolbar-actions",
+                    button {
+                        class: "emojis-toolbar-export-button",
+                        r#type: "button",
+                        disabled: selected_count == 0 || exporting(),
+                        onclick: move |_| {
+                            let export_emojis = emojis
+                                .read()
+                                .iter()
+                                .filter(|emoji| emoji.read().selected)
+                                .map(|emoji| ExportEmoji {
+                                    file_name: emoji.read().file_name.clone(),
+                                    emoji_name: emoji.read().emoji_name.clone(),
+                                    category: emoji.read().category.clone(),
+                                    aliases: emoji.read().aliases.clone(),
+                                    license: emoji.read().license.clone(),
+                                    image: emoji.read().bytes.as_ref().clone(),
+                                })
+                                .collect::<Vec<_>>();
+                            exporting.set(true);
+                            export_message.set("書き出しています…".to_string());
+                            spawn(async move {
+                                match export_emoji_package(export_emojis).await {
+                                    Ok(Some(summary)) => {
+                                        export_message
+                                            .set(
+                                                format!(
+                                                    "{} 件を書き出しました: {}",
+                                                    summary.emoji_count,
+                                                    summary.path,
+                                                ),
+                                            )
+                                    }
+                                    Ok(None) => export_message.set(String::new()),
+                                    Err(error) => export_message.set(error),
+                                }
+                                exporting.set(false);
+                            });
+                        },
+                        "書き出し"
+                    }
+                    button {
+                        class: "emojis-toolbar-danger-button",
+                        r#type: "button",
+                        disabled: selected_count == 0,
+                        onclick: move |_| pending_delete_count.set(Some(selected_count)),
+                        "除去"
+                    }
                 }
             }
             if !export_message.read().is_empty() {

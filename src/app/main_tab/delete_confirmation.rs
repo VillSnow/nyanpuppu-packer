@@ -14,8 +14,8 @@ pub fn DeleteConfirmation(
                 class: "confirm-dialog",
                 role: "dialog",
                 aria_modal: "true",
-                aria_label: "画像の削除確認",
-                p { "{count}件の画像を表から削除します" }
+                aria_label: "画像の除去確認",
+                p { "{count}件の画像を表から除去します" }
                 div { class: "confirm-dialog-actions",
                     button {
                         r#type: "button",
@@ -29,7 +29,7 @@ pub fn DeleteConfirmation(
                             emojis.with_mut(|all| all.retain(|emoji| !emoji.read().selected));
                             pending_delete_count.set(None);
                         },
-                        "削除"
+                        "除去"
                     }
                 }
             }
