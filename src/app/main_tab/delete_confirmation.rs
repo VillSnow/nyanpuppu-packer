@@ -26,7 +26,7 @@ pub fn DeleteConfirmation(
                         r#type: "button",
                         class: "danger-button",
                         onclick: move |_| {
-                            emojis.with_mut(|all| all.retain(|emoji| !emoji.selected));
+                            emojis.with_mut(|all| all.retain(|emoji| !emoji.read().selected));
                             pending_delete_count.set(None);
                         },
                         "削除"

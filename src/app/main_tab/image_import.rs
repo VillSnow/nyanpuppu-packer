@@ -26,6 +26,7 @@ pub fn import_images(
             total: files.len() * 3,
         });
         gloo_timers::future::TimeoutFuture::new(0).await;
+
         for file in files {
             let name = file.name();
             let mime = file
@@ -58,7 +59,7 @@ pub fn import_images(
 
         let mut existing_md5_hashes = HashSet::new();
         emojis.with(|current| {
-            existing_md5_hashes.extend(current.iter().map(|emoji| emoji.md5.clone()));
+            existing_md5_hashes.extend(current.iter().map(|emoji| emoji.read().md5.clone()));
         });
         loaded.retain(|emoji| existing_md5_hashes.insert(emoji.md5.clone()));
 
@@ -118,13 +119,18 @@ pub fn import_images(
             matching_progress.with_mut(|progress| progress.total += loaded.len());
         }
 
+        let scope = emojis.origin_scope();
         emojis.with_mut(|current| {
             let mut known_md5_hashes = current
                 .iter()
-                .map(|emoji| emoji.md5.clone())
+                .map(|emoji| emoji.read().md5.clone())
                 .collect::<HashSet<_>>();
             loaded.retain(|emoji| known_md5_hashes.insert(emoji.md5.clone()));
-            current.extend(loaded);
+            current.extend(
+                loaded
+                    .into_iter()
+                    .map(|emoji| Signal::new_in_scope(emoji, scope)),
+            );
         });
         matching.finish();
     });

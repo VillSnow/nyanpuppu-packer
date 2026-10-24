@@ -41,7 +41,7 @@ pub fn MainTab(active: bool) -> Element {
                         pending_delete_count,
                         visibilities,
                     }
-                    EmojisGrid { emojis: current_emojis, visibilities }
+                    EmojisGrid { visibilities }
                 }
             }
         }
@@ -76,7 +76,7 @@ fn ImageAddToolbar(match_threshold: Signal<u32>, matching: MatchingState) -> Ele
     let matched_emoji_count = emojis
         .read()
         .iter()
-        .filter(|emoji| !emoji.matches.is_empty())
+        .filter(|emoji| !emoji.read().matches.is_empty())
         .count();
     let emoji_count = emojis.read().len();
 
@@ -136,7 +136,11 @@ fn EmojisToolbar(
     visibilities: ColumnVisibilities,
 ) -> Element {
     let emojis: EditingEmojis = use_context();
-    let selected_count = emojis.read().iter().filter(|emoji| emoji.selected).count();
+    let selected_count = emojis
+        .read()
+        .iter()
+        .filter(|emoji| emoji.read().selected)
+        .count();
     let mut exporting = use_signal(|| false);
 
     rsx! {
@@ -184,14 +188,14 @@ fn EmojisToolbar(
                         let export_emojis = emojis
                             .read()
                             .iter()
-                            .filter(|emoji| emoji.selected)
+                            .filter(|emoji| emoji.read().selected)
                             .map(|emoji| ExportEmoji {
-                                file_name: emoji.file_name.clone(),
-                                emoji_name: emoji.emoji_name.clone(),
-                                category: emoji.category.clone(),
-                                aliases: emoji.aliases.clone(),
-                                license: emoji.license.clone(),
-                                image: emoji.bytes.as_ref().clone(),
+                                file_name: emoji.read().file_name.clone(),
+                                emoji_name: emoji.read().emoji_name.clone(),
+                                category: emoji.read().category.clone(),
+                                aliases: emoji.read().aliases.clone(),
+                                license: emoji.read().license.clone(),
+                                image: emoji.read().bytes.as_ref().clone(),
                             })
                             .collect::<Vec<_>>();
                         exporting.set(true);

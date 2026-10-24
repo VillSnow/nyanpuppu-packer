@@ -94,7 +94,13 @@ pub fn rematch_emojis(
         let snapshots = emojis
             .read()
             .iter()
-            .filter_map(|emoji| emoji.hash.clone().map(|hash| (emoji.md5.clone(), hash)))
+            .filter_map(|emoji| {
+                emoji
+                    .read()
+                    .hash
+                    .clone()
+                    .map(|hash| (emoji.read().md5.clone(), hash))
+            })
             .collect::<Vec<_>>();
         matching_progress.with_mut(|progress| progress.total = snapshots.len());
         for (md5, hash) in snapshots {
@@ -106,9 +112,11 @@ pub fn rematch_emojis(
                 break;
             }
             emojis.with_mut(|current| {
-                if let Some(emoji) = current.iter_mut().find(|emoji| emoji.md5 == md5) {
-                    emoji.matches = matches;
-                    emoji.error = error;
+                if let Some(emoji) = current.iter_mut().find(|emoji| emoji.read().md5 == md5) {
+                    emoji.with_mut(|emoji| {
+                        emoji.matches = matches;
+                        emoji.error = error;
+                    });
                 }
             });
             matching_progress.with_mut(|progress| progress.completed += 1);

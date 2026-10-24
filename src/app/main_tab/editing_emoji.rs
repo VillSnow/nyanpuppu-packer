@@ -21,19 +21,4 @@ pub struct EditingEmoji {
 pub enum EditingEmojisTag {}
 
 /// 編集中の絵文字リストを MainTab 配下で共有するコンテキスト。
-pub type EditingEmojis = Ctx<Vec<EditingEmoji>, EditingEmojisTag>;
-
-pub trait EditingEmojisExt {
-    fn get_by_md5(&self, md5_hash: &str) -> Option<&EditingEmoji>;
-    fn get_by_md5_mut(&mut self, md5_hash: &str) -> Option<&mut EditingEmoji>;
-}
-
-impl EditingEmojisExt for Vec<EditingEmoji> {
-    fn get_by_md5(&self, md5_hash: &str) -> Option<&EditingEmoji> {
-        self.iter().find(|emoji| emoji.md5 == md5_hash)
-    }
-
-    fn get_by_md5_mut(&mut self, md5_hash: &str) -> Option<&mut EditingEmoji> {
-        self.iter_mut().find(|emoji| emoji.md5 == md5_hash)
-    }
-}
+pub type EditingEmojis = Ctx<Vec<dioxus::signals::Signal<EditingEmoji>>, EditingEmojisTag>;

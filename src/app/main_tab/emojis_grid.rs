@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use super::editing_emoji::{EditingEmoji, EditingEmojis, EditingEmojisExt};
+use super::editing_emoji::{EditingEmoji, EditingEmojis};
 use crate::backend::EmojiMatch;
 use dioxus::prelude::*;
 
@@ -74,7 +74,8 @@ const LICENSE_CANDIDATE: &str = "license_candidate";
 const LICENSE_SOURCE: &str = "license_source";
 
 #[component]
-pub fn EmojisGrid(emojis: Vec<EditingEmoji>, visibilities: ColumnVisibilities) -> Element {
+pub fn EmojisGrid(visibilities: ColumnVisibilities) -> Element {
+    let emojis: EditingEmojis = use_context();
     let grid_template_columns = {
         fn track(name: &str, value: &str, vis: bool) -> String {
             if vis {
@@ -157,17 +158,12 @@ pub fn EmojisGrid(emojis: Vec<EditingEmoji>, visibilities: ColumnVisibilities) -
     };
 
     rsx! {
-
         div {
             class: "emojis-grid",
             style: "grid-template-columns: {grid_template_columns};",
             EmojiGridHeader { visibilities }
-            for emoji in emojis {
-                EmojiGridRows {
-                    key: "{emoji.md5}",
-                    md5: emoji.md5.clone(),
-                    visibilities,
-                }
+            for emoji in emojis() {
+                EmojiGridRows { emoji, visibilities }
             }
         }
 
@@ -184,14 +180,24 @@ fn EmojiGridHeader(visibilities: ColumnVisibilities) -> Element {
                 button {
                     r#type: "button",
                     onclick: move |_| {
-                        emojis.with_mut(|all| all.iter_mut().for_each(|emoji| emoji.selected = true))
+                        emojis
+                            .with_mut(|all| {
+                                for emoji in all {
+                                    emoji.write().selected = true;
+                                }
+                            })
                     },
                     "全選択"
                 }
                 button {
                     r#type: "button",
                     onclick: move |_| {
-                        emojis.with_mut(|all| all.iter_mut().for_each(|emoji| emoji.selected = false))
+                        emojis
+                            .with_mut(|all| {
+                                for emoji in all {
+                                    emoji.write().selected = false;
+                                }
+                            })
                     },
                     "全解除"
                 }
@@ -231,24 +237,21 @@ fn EmojiGridHeader(visibilities: ColumnVisibilities) -> Element {
 }
 
 #[component]
-fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
-    let emojis: EditingEmojis = use_context();
-    let emoji = emojis
-        .read()
-        .iter()
-        .find(|emoji| emoji.md5 == md5)
-        .unwrap()
-        .clone();
-
-    let category_candidates = group_matches_by_key(&emoji.matches, |candidate| {
-        [candidate.category.as_deref().unwrap_or("").trim().to_owned()]
+fn EmojiGridRows(emoji: Signal<EditingEmoji>, visibilities: ColumnVisibilities) -> Element {
+    let category_candidates = group_matches_by_key(&emoji.read().matches, |candidate| {
+        [candidate
+            .category
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .to_owned()]
     });
 
-    let emoji_name_candidates = group_matches_by_key(&emoji.matches, |candidate| {
+    let emoji_name_candidates = group_matches_by_key(&emoji.read().matches, |candidate| {
         [candidate.name.trim().to_owned()]
     });
 
-    let alias_candidates = group_matches_by_key(&emoji.matches, |candidate| {
+    let alias_candidates = group_matches_by_key(&emoji.read().matches, |candidate| {
         candidate
             .aliases
             .iter()
@@ -256,7 +259,7 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             .collect::<Vec<String>>()
     });
 
-    let license_candidates = group_matches_by_key(&emoji.matches, |candidate| {
+    let license_candidates = group_matches_by_key(&emoji.read().matches, |candidate| {
         [candidate.license.as_deref().unwrap_or("").trim().to_owned()]
     });
 
@@ -266,29 +269,22 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             div { class: "cell", style: "grid-column: {CHK_AND_PREVIEW}",
                 div { class: "organelle sticky-item toggle-and-preview",
                     input {
-                        id: "emoji-select-{md5}",
+                        id: "emoji-select-{emoji.read().md5}",
                         r#type: "checkbox",
-                        checked: emoji.selected,
-                        aria_label: "{emoji.file_name} を選択",
+                        checked: emoji.read().selected,
+                        aria_label: "{emoji.read().file_name} を選択",
                         onchange: {
-                            let mut emojis = emojis.clone();
-                            let md5 = md5.clone();
+                            let mut emoji = emoji.clone();
                             move |event| {
-                                emojis
-                                    .with_mut(|all| {
-                                        all
-                                            .iter_mut()
-                                            .for_each(|emoji| {
-                                                if emoji.md5 == md5 {
-                                                    emoji.selected = event.checked();
-                                                }
-                                            })
-                                    })
+                                emoji.write().selected = event.checked();
+
                             }
                         },
                     }
-                    label { class: "preview-toggle", r#for: "emoji-select-{md5}",
-                        img { src: "{emoji.preview}", alt: "" }
+                    label {
+                        class: "preview-toggle",
+                        r#for: "emoji-select-{emoji.read().md5}",
+                        img { src: "{emoji.read().preview}", alt: "" }
                     }
                 }
             }
@@ -299,7 +295,7 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                 style: "grid-column: file_name",
                 hidden: !(visibilities.file_name)(),
                 div { class: "organelle sticky-item",
-                    div { "{emoji.file_name}" }
+                    div { "{emoji.read().file_name}" }
                 }
             }
 
@@ -312,17 +308,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                     input {
                         r#type: "text",
                         placeholder: "カテゴリ",
-                        value: "{emoji.category}",
+                        value: "{emoji.read().category}",
                         oninput: {
-                            let mut emojis = emojis.clone();
-                            let md5 = md5.clone();
-                            move |event| {
-                                emojis
-                                    .with_mut(|emojis| {
-                                        let emoji = emojis.get_by_md5_mut(&md5).unwrap();
-                                        emoji.category = event.value();
-                                    })
-                            }
+                            let mut emoji = emoji.clone();
+                            move |event| emoji.write().category = event.value()
                         },
                     }
 
@@ -332,11 +321,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             // カテゴリ候補
             {
                 candidate_buttons(
-                    emoji.md5.clone(),
                     CATEGORY_CANDIDATE,
                     (visibilities.category_fields)() && (visibilities.candidates)(),
+                    emoji.clone(),
                     &category_candidates,
-                    emojis.clone(),
                     |emoji, category| { emoji.category == category },
                     |emoji, category| {
                         if emoji.category == category {
@@ -367,17 +355,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                     input {
                         r#type: "text",
                         placeholder: "絵文字名",
-                        value: "{emoji.emoji_name}",
+                        value: "{emoji.read().emoji_name}",
                         oninput: {
-                            let mut emojis = emojis.clone();
-                            let md5 = md5.clone();
-                            move |event| {
-                                emojis
-                                    .with_mut(|emojis| {
-                                        let emoji = emojis.get_by_md5_mut(&md5).unwrap();
-                                        emoji.emoji_name = event.value();
-                                    })
-                            }
+                            let mut emoji = emoji.clone();
+                            move |event| emoji.write().emoji_name = event.value()
                         },
                     }
 
@@ -387,11 +368,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             // 絵文字名候補
             {
                 candidate_buttons(
-                    emoji.md5.clone(),
                     EMOJI_NAME_CANDIDATE,
                     (visibilities.emoji_name_fields)() && (visibilities.candidates)(),
+                    emoji.clone(),
                     &emoji_name_candidates,
-                    emojis.clone(),
                     |emoji, emoji_name| { emoji.emoji_name == emoji_name },
                     |emoji, emoji_name| {
                         emoji.emoji_name = emoji_name.clone();
@@ -418,22 +398,17 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                     style: "min-height: calc(var(--organelle-unit) * 3); height: 100%;",
                     textarea {
                         placeholder: "タグを1行ずつ入力",
-                        value: emoji.aliases.join("\n"),
+                        value: emoji.read().aliases.join("\n"),
                         oninput: {
-                            let mut emojis = emojis.clone();
-                            let md5 = md5.clone();
+                            let mut emoji = emoji.clone();
                             move |event| {
-                                emojis
-                                    .with_mut(|emojis| {
-                                        let emoji = emojis.get_by_md5_mut(&md5).unwrap();
-                                        let tags = event
-                                            .value()
-                                            .lines()
-                                            .filter(|tag| !tag.is_empty())
-                                            .map(str::to_string)
-                                            .collect();
-                                        emoji.aliases = tags;
-                                    });
+                                let tags = event
+                                    .value()
+                                    .lines()
+                                    .filter(|tag| !tag.is_empty())
+                                    .map(str::to_string)
+                                    .collect();
+                                emoji.write().aliases = tags;
                             }
                         },
                     }
@@ -443,11 +418,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             // エイリアス候補
             {
                 candidate_buttons(
-                    emoji.md5.clone(),
                     ALIAS_CANDIDATE,
                     (visibilities.alias_fields)() && (visibilities.candidates)(),
+                    emoji.clone(),
                     &alias_candidates,
-                    emojis.clone(),
                     |emoji, tag| { emoji.aliases.contains(&tag) },
                     |emoji, tag| {
                         if emoji.aliases.contains(&tag) {
@@ -477,16 +451,11 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                     input {
                         r#type: "text",
                         placeholder: "ライセンス",
-                        value: "{emoji.license}",
+                        value: "{emoji.read().license}",
                         oninput: {
-                            let mut emojis = emojis.clone();
-                            let md5 = md5.clone();
+                            let mut emoji = emoji.clone();
                             move |event| {
-                                emojis
-                                    .with_mut(|emojis| {
-                                        let emoji = emojis.get_by_md5_mut(&md5).unwrap();
-                                        emoji.license = event.value();
-                                    })
+                                emoji.write().license = event.value();
                             }
                         },
                     }
@@ -497,11 +466,11 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
             // ライセンス候補
             {
                 candidate_buttons(
-                    emoji.md5.clone(),
+
                     LICENSE_CANDIDATE,
                     (visibilities.license_fields)() && (visibilities.candidates)(),
+                    emoji.clone(),
                     &license_candidates,
-                    emojis.clone(),
                     |emoji, license| { emoji.license == license },
                     |emoji, license| {
                         if emoji.license == license {
@@ -526,11 +495,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
 }
 
 fn candidate_buttons(
-    emoji_md5_hash: String,
     column: &str,
     vis: bool,
+    emoji: Signal<EditingEmoji>,
     groups: &Vec<(String, Vec<EmojiMatch>)>,
-    emojis: EditingEmojis,
     selected: fn(&EditingEmoji, String) -> bool,
     modify: fn(&mut EditingEmoji, String),
 ) -> Element {
@@ -543,16 +511,14 @@ fn candidate_buttons(
                         style: "height: calc(var(--organelle-unit) * {ms.len()});",
                         div {
                             class: "organelle sticky-item",
-                            class: if selected(emojis.read().get_by_md5(&emoji_md5_hash).unwrap(), key.clone()) { "selected" },
+                            class: if selected(&emoji.read(), key.clone()) { "selected" },
                             button {
                                 onclick: {
-                                    let mut emojis = emojis.clone();
-                                    let emoji_md5_hash = emoji_md5_hash.clone();
+                                    let mut emoji = emoji.clone();
                                     let key = key.clone();
                                     move |_| {
-                                        emojis
-                                            .with_mut(|emojis| {
-                                                let emoji = emojis.get_by_md5_mut(&emoji_md5_hash).unwrap();
+                                        emoji
+                                            .with_mut(|emoji| {
                                                 modify(emoji, key.clone());
                                             })
                                     }
