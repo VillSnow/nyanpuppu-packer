@@ -52,7 +52,13 @@ where
     let mut result = groups
         .into_iter()
         .collect::<Vec<(String, Vec<EmojiMatch>)>>();
-    result.sort_by(|a, b| a.0.cmp(&b.0));
+    // 各グループに含まれるソースサーバーの host_rank の最小値の昇順、同順位ならキーの昇順
+    result.sort_by_cached_key(|(key, ms)| {
+        (
+            ms.iter().map(|m| m.host_rank).min().unwrap_or(usize::MAX),
+            key.clone(),
+        )
+    });
 
     result
 }

@@ -7,6 +7,12 @@ use tauri::Manager;
 
 pub const DATABASE_VERSION: &str = "2026-10-13";
 
+/// サーバーの並び順（お気に入り、short_name / name、URL）。テーブルのエイリアスは `s`。
+const SERVER_ORDER: &str = "s.favorite desc,
+    coalesce(s.short_name, s.name) is null,
+    coalesce(s.short_name, s.name),
+    s.url";
+
 #[derive(Serialize)]
 pub struct Server {
     id: i64,
@@ -45,6 +51,8 @@ pub struct EmojiMatch {
     pub license: Option<String>,
     pub host: String,
     pub host_label: String,
+    /// サーバー一覧と同じ並び順での順位（小さいほど先頭）
+    pub host_rank: usize,
     pub distance: u32,
 }
 
@@ -114,6 +122,21 @@ pub fn find_emoji_matches(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
+    let server_ranks = {
+        let mut statement = connection
+            .prepare(&format!("select s.url from servers s order by {SERVER_ORDER}"))
+            .map_err(|e| e.to_string())?;
+        statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .enumerate()
+            .map(|(rank, url)| (url, rank))
+            .collect::<HashMap<_, _>>()
+    };
+
     let mut best_by_name: HashMap<(String, String), EmojiMatch> = HashMap::new();
     for (host, candidate_hash, name, category, mut aliases, license, host_label) in candidates {
         if name.trim().is_empty() {
@@ -123,6 +146,7 @@ pub fn find_emoji_matches(
         let distance = crate::image_hash::distance(hash, &candidate_hash);
         if distance <= threshold {
             let key = (host.clone(), name.clone());
+            let host_rank = server_ranks.get(&host).copied().unwrap_or(usize::MAX);
             let candidate = EmojiMatch {
                 name,
                 hash: candidate_hash,
@@ -131,6 +155,7 @@ pub fn find_emoji_matches(
                 license,
                 host,
                 host_label,
+                host_rank,
                 distance,
             };
             if best_by_name
@@ -142,7 +167,12 @@ pub fn find_emoji_matches(
         }
     }
     let mut matches = best_by_name.into_values().collect::<Vec<_>>();
-    matches.sort_by_key(|item| item.distance);
+    matches.sort_by(|a, b| {
+        a.host_rank
+            .cmp(&b.host_rank)
+            .then(a.distance.cmp(&b.distance))
+            .then_with(|| a.name.cmp(&b.name))
+    });
     Ok(matches)
 }
 
@@ -320,15 +350,12 @@ fn ensure_column(
 pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
     let connection = open_database(&app)?;
     let mut statement = connection
-        .prepare(
+        .prepare(&format!(
             "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite, s.name, s.short_name
          from servers s left join emojis e on e.host = s.url
          group by s.id
-         order by s.favorite desc,
-                  coalesce(s.short_name, s.name) is null,
-                  coalesce(s.short_name, s.name),
-                  s.url",
-        )
+         order by {SERVER_ORDER}"
+        ))
         .map_err(|e| e.to_string())?;
     let rows = statement
         .query_map([], |row| {

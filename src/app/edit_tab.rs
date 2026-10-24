@@ -295,10 +295,13 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
         let mut sources = BTreeMap::new();
         for emoji in emojis.read().iter() {
             for m in &emoji.read().matches {
-                sources.insert(m.host.clone(), m.host_label.clone());
+                sources.insert((m.host_rank, m.host.clone()), m.host_label.clone());
             }
         }
-        sources.into_iter().collect::<Vec<_>>()
+        sources
+            .into_iter()
+            .map(|((_, host), label)| (host, label))
+            .collect::<Vec<_>>()
     };
 
     // 選択中の候補サーバーが存在しなくなった場合は先頭のサーバーに戻す

@@ -36,6 +36,7 @@ pub struct EmojiMatch {
     pub license: Option<String>,
     pub host: String,
     pub host_label: String,
+    pub host_rank: usize,
     pub distance: u32,
 }
 
