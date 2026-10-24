@@ -13,6 +13,7 @@ pub struct Server {
     pub url: String,
     pub emoji_count: i64,
     pub last_fetched_at: Option<String>,
+    pub favorite: bool,
 }
 
 #[derive(Clone, Deserialize, PartialEq)]
@@ -162,6 +163,13 @@ pub async fn remove_server(id: i64) -> Result<bool, String> {
         invoke_args("id", JsValue::from_f64(id as f64)),
     )
     .await
+}
+
+pub async fn set_server_favorite(id: i64, favorite: bool) -> Result<bool, String> {
+    let args = Object::new();
+    let _ = Reflect::set(&args, &"id".into(), &JsValue::from_f64(id as f64));
+    let _ = Reflect::set(&args, &"favorite".into(), &JsValue::from_bool(favorite));
+    invoke("set_server_favorite", args.into()).await
 }
 
 pub async fn fetch_server_emojis(id: i64) -> Result<FetchSummary, String> {

@@ -34,5 +34,6 @@ create table if not exists "servers" (
     "id" integer primary key,
     "url" text not null unique,
     "enabled" integer not null default 1,
-    "last_fetched_at" text
+    "last_fetched_at" text,
+    "favorite" integer not null default 0
 );

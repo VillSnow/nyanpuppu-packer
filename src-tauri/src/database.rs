@@ -13,6 +13,7 @@ pub struct Server {
     url: String,
     emoji_count: i64,
     last_fetched_at: Option<String>,
+    favorite: bool,
 }
 
 pub struct EmojiRecord {
@@ -159,6 +160,12 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     ensure_column(&connection, "emojis", "etag", "text")?;
     ensure_column(&connection, "emojis", "last_modified", "text")?;
     ensure_column(&connection, "servers", "last_fetched_at", "text")?;
+    ensure_column(
+        &connection,
+        "servers",
+        "favorite",
+        "integer not null default 0",
+    )?;
     Ok(connection)
 }
 
@@ -305,9 +312,9 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
     let connection = open_database(&app)?;
     let mut statement = connection
         .prepare(
-            "select s.id, s.url, count(e.name), s.last_fetched_at
+            "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite
          from servers s left join emojis e on e.host = s.url
-         group by s.id order by s.id",
+         group by s.id order by s.favorite desc, s.url",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
@@ -317,10 +324,26 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
                 url: row.get(1)?,
                 emoji_count: row.get(2)?,
                 last_fetched_at: row.get(3)?,
+                favorite: row.get(4)?,
             })
         })
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_server_favorite(
+    app: tauri::AppHandle,
+    id: i64,
+    favorite: bool,
+) -> Result<bool, String> {
+    open_database(&app)?
+        .execute(
+            "update servers set favorite = ?1 where id = ?2",
+            params![favorite, id],
+        )
+        .map(|_| true)
         .map_err(|e| e.to_string())
 }
 

@@ -694,6 +694,7 @@ pub fn run() {
             database::rebuild_hash_parts,
             add_server,
             remove_server,
+            database::set_server_favorite,
             fetch_server_emojis,
             calculate_image_hash,
             compare_images,

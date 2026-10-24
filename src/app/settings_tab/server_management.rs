@@ -1,6 +1,6 @@
 use crate::backend::{
     FetchProgress, Server, add_server, fetch_server_emojis, list_servers, rebuild_hash_parts,
-    remove_server,
+    remove_server, set_server_favorite,
 };
 use dioxus::prelude::*;
 use std::collections::HashMap;
@@ -140,6 +140,30 @@ pub fn ServerManagement(
                                     }
                                 }
                                 div { class: "server-actions",
+                                    button {
+                                        class: if server.favorite { "secondary-button favorite-button active" } else { "secondary-button favorite-button" },
+                                        r#type: "button",
+                                        aria_pressed: server.favorite,
+                                        onclick: move |_| {
+                                            let id = server.id;
+                                            let favorite = !server.favorite;
+                                            spawn(async move {
+                                                match set_server_favorite(id, favorite).await {
+                                                    Ok(_) => {
+                                                        if let Ok(items) = list_servers().await {
+                                                            servers.set(items);
+                                                        }
+                                                    }
+                                                    Err(error) => message.set(error),
+                                                }
+                                            });
+                                        },
+                                        if server.favorite {
+                                            "★ お気に入り"
+                                        } else {
+                                            "☆ お気に入り"
+                                        }
+                                    }
                                     button {
                                         class: "secondary-button",
                                         r#type: "button",

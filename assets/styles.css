@@ -303,6 +303,12 @@ body {
   gap: 0.5em;
 }
 
+.favorite-button.active {
+  border-color: #f79009;
+  background: #fffaeb;
+  color: #b54708;
+}
+
 .text-danger-button {
   border-color: transparent;
   background: transparent;
