@@ -149,6 +149,10 @@ fn EmojisToolbar(
                         flag: visibilities.file_name,
                     }
                     LabeledCheckbox {
+                        label: "カテゴリを表示",
+                        flag: visibilities.category_fields,
+                    }
+                    LabeledCheckbox {
                         label: "絵文字名を表示",
                         flag: visibilities.emoji_name_fields,
                     }
@@ -184,6 +188,7 @@ fn EmojisToolbar(
                             .map(|emoji| ExportEmoji {
                                 file_name: emoji.file_name.clone(),
                                 emoji_name: emoji.emoji_name.clone(),
+                                category: emoji.category.clone(),
                                 aliases: emoji.aliases.clone(),
                                 license: emoji.license.clone(),
                                 image: emoji.bytes.as_ref().clone(),

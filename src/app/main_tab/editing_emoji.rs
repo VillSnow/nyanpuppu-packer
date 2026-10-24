@@ -12,6 +12,7 @@ pub struct EditingEmoji {
     pub matches: Vec<EmojiMatch>,
     pub error: Option<String>,
     pub emoji_name: String,
+    pub category: String,
     pub aliases: Vec<String>,
     pub license: String,
     pub selected: bool,

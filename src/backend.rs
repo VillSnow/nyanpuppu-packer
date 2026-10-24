@@ -83,6 +83,7 @@ pub struct ExportSummary {
 pub struct ExportEmoji {
     pub file_name: String,
     pub emoji_name: String,
+    pub category: String,
     pub aliases: Vec<String>,
     pub license: String,
     pub image: Vec<u8>,
@@ -242,6 +243,7 @@ pub async fn export_emoji_package(
         }
         let _ = Reflect::set(&item, &"file_name".into(), &emoji.file_name.into());
         let _ = Reflect::set(&item, &"emoji_name".into(), &emoji.emoji_name.into());
+        let _ = Reflect::set(&item, &"category".into(), &emoji.category.into());
         let _ = Reflect::set(&item, &"aliases".into(), &aliases);
         let _ = Reflect::set(&item, &"license".into(), &emoji.license.into());
         let _ = Reflect::set(&item, &"image".into(), &bytes_to_js(&emoji.image));

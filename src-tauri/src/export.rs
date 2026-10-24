@@ -10,6 +10,7 @@ const PACKAGE_HOST: &str = "nyanpuppu-packer";
 pub struct ExportEmoji {
     pub file_name: String,
     pub emoji_name: String,
+    pub category: String,
     pub aliases: Vec<String>,
     pub license: String,
     pub image: Vec<u8>,
@@ -18,6 +19,7 @@ pub struct ExportEmoji {
 pub struct PreparedEmoji {
     archive_file_name: String,
     name: String,
+    category: Option<String>,
     aliases: Vec<String>,
     license: Option<String>,
     image: Vec<u8>,
@@ -107,11 +109,13 @@ pub fn prepare(emojis: Vec<ExportEmoji>) -> Result<Vec<PreparedEmoji>> {
                 aliases.push(alias);
             }
         }
+        let category = emoji.category.trim();
         let license = emoji.license.trim();
 
         prepared.push(PreparedEmoji {
             archive_file_name: format!("{name}.{extension}"),
             name,
+            category: (!category.is_empty()).then(|| category.to_owned()),
             aliases,
             license: (!license.is_empty()).then(|| license.to_owned()),
             image: emoji.image,
@@ -137,7 +141,7 @@ pub fn build_package(emojis: &[PreparedEmoji]) -> Result<Vec<u8>> {
                 file_name: &emoji.archive_file_name,
                 emoji: PackageEmojiInfo {
                     name: &emoji.name,
-                    category: None,
+                    category: emoji.category.as_deref(),
                     aliases: &emoji.aliases,
                     license: emoji.license.as_deref(),
                     local_only: false,
@@ -184,6 +188,7 @@ mod tests {
         ExportEmoji {
             file_name: "a.png".into(),
             emoji_name: name.into(),
+            category: " Cat ".into(),
             aliases: vec![" neko ".into(), "neko".into(), "".into()],
             license: " CC0 ".into(),
             image: png(),
@@ -200,6 +205,7 @@ mod tests {
         let meta: serde_json::Value = serde_json::from_str(&meta).unwrap();
         assert_eq!(meta["emojis"][0]["fileName"], "nyan.png");
         assert_eq!(meta["emojis"][0]["emoji"]["aliases"], serde_json::json!(["neko"]));
+        assert_eq!(meta["emojis"][0]["emoji"]["category"], "Cat");
         assert_eq!(meta["emojis"][0]["emoji"]["license"], "CC0");
         assert!(zip.by_name("nyan.png").is_ok());
     }

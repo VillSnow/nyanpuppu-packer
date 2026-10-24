@@ -10,6 +10,7 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, PartialEq)]
 pub struct ColumnVisibilities {
     pub file_name: Signal<bool>,
+    pub category_fields: Signal<bool>,
     pub emoji_name_fields: Signal<bool>,
     pub license_fields: Signal<bool>,
     pub alias_fields: Signal<bool>,
@@ -19,6 +20,7 @@ pub struct ColumnVisibilities {
 pub fn use_column_visibilities() -> ColumnVisibilities {
     ColumnVisibilities {
         file_name: use_signal(|| true),
+        category_fields: use_signal(|| true),
         emoji_name_fields: use_signal(|| true),
         license_fields: use_signal(|| true),
         alias_fields: use_signal(|| true),
@@ -58,6 +60,9 @@ where
 // グリッドのトラック名
 const CHK_AND_PREVIEW: &str = "chk_and_preview";
 const FILE_NAME: &str = "file_name";
+const CATEGORY_FIELDS: &str = "category_fields";
+const CATEGORY_CANDIDATE: &str = "category_candidate";
+const CATEGORY_SOURCE: &str = "category_source";
 const EMOJI_NAME_FIELDS: &str = "emoji_name_fields";
 const EMOJI_NAME_CANDIDATE: &str = "emoji_name_candidate";
 const EMOJI_NAME_SOURCE: &str = "emoji_name_source";
@@ -86,6 +91,22 @@ pub fn EmojisGrid(emojis: Vec<EditingEmoji>, visibilities: ColumnVisibilities) -
                 FILE_NAME,
                 "minmax(max-content, auto)",
                 (visibilities.file_name)(),
+            ),
+            // カテゴリ
+            track(
+                CATEGORY_FIELDS,
+                "minmax(max-content, auto)",
+                (visibilities.category_fields)(),
+            ),
+            track(
+                CATEGORY_CANDIDATE,
+                "minmax(max-content, auto)",
+                (visibilities.category_fields)() && (visibilities.candidates)(),
+            ),
+            track(
+                CATEGORY_SOURCE,
+                "minmax(max-content, auto)",
+                (visibilities.category_fields)() && (visibilities.candidates)(),
             ),
             // 絵文字名
             track(
@@ -183,6 +204,12 @@ fn EmojiGridHeader(visibilities: ColumnVisibilities) -> Element {
             }
             div {
                 class: "cell",
+                hidden: !(visibilities.category_fields)(),
+                style: "grid-column: {CATEGORY_FIELDS} / span 3",
+                "カテゴリ"
+            }
+            div {
+                class: "cell",
                 hidden: !(visibilities.emoji_name_fields)(),
                 style: "grid-column: {EMOJI_NAME_FIELDS} / span 3",
                 "絵文字名"
@@ -212,6 +239,10 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
         .find(|emoji| emoji.md5 == md5)
         .unwrap()
         .clone();
+
+    let category_candidates = group_matches_by_key(&emoji.matches, |candidate| {
+        [candidate.category.as_deref().unwrap_or("").trim().to_owned()]
+    });
 
     let emoji_name_candidates = group_matches_by_key(&emoji.matches, |candidate| {
         [candidate.name.trim().to_owned()]
@@ -270,6 +301,60 @@ fn EmojiGridRows(md5: String, visibilities: ColumnVisibilities) -> Element {
                 div { class: "organelle sticky-item",
                     div { "{emoji.file_name}" }
                 }
+            }
+
+            // カテゴリ入力
+            div {
+                class: "cell",
+                style: "grid-column: {CATEGORY_FIELDS};",
+                hidden: !(visibilities.category_fields)(),
+                div { class: "organelle sticky-item",
+                    input {
+                        r#type: "text",
+                        placeholder: "カテゴリ",
+                        value: "{emoji.category}",
+                        oninput: {
+                            let mut emojis = emojis.clone();
+                            let md5 = md5.clone();
+                            move |event| {
+                                emojis
+                                    .with_mut(|emojis| {
+                                        let emoji = emojis.get_by_md5_mut(&md5).unwrap();
+                                        emoji.category = event.value();
+                                    })
+                            }
+                        },
+                    }
+
+                }
+            }
+
+            // カテゴリ候補
+            {
+                candidate_buttons(
+                    emoji.md5.clone(),
+                    CATEGORY_CANDIDATE,
+                    (visibilities.category_fields)() && (visibilities.candidates)(),
+                    &category_candidates,
+                    emojis.clone(),
+                    |emoji, category| { emoji.category == category },
+                    |emoji, category| {
+                        if emoji.category == category {
+                            emoji.category.clear();
+                        } else {
+                            emoji.category = category.clone();
+                        }
+                    },
+                )
+            }
+
+            // カテゴリ候補のホスト
+            {
+                source_host_labels(
+                    CATEGORY_SOURCE,
+                    (visibilities.category_fields)() && (visibilities.candidates)(),
+                    &category_candidates,
+                )
             }
 
             // 絵文字名入力

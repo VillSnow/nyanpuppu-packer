@@ -46,6 +46,7 @@ pub fn import_images(
                     matches: Vec::new(),
                     error: None,
                     emoji_name: String::new(),
+                    category: String::new(),
                     aliases: Vec::new(),
                     license: String::new(),
                     selected: true,
