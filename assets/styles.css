@@ -500,6 +500,39 @@ body {
   display: none;
 }
 
+.export-review-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.export-review-table th,
+.export-review-table td {
+  padding: 0.375em 0.75em;
+  border-bottom: 1px solid #eaecf0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.export-review-table th {
+  position: sticky;
+  top: -1.5em;
+  background: #f9fafb;
+  color: #667085;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.export-review-table img {
+  display: block;
+  width: 2.5em;
+  height: 2.5em;
+  object-fit: contain;
+}
+
+.export-review-table .empty-value {
+  color: #98a2b3;
+}
+
 .matching-overlay {
   position: fixed;
   z-index: 1000;
