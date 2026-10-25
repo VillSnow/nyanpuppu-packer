@@ -2,11 +2,13 @@
 
 mod edit_tab;
 mod export_tab;
+mod help_tab;
 mod settings_tab;
 
 use dioxus::prelude::*;
 use edit_tab::{EditTab, EditingEmojis};
 use export_tab::ExportTab;
+use help_tab::HelpTab;
 use settings_tab::SettingsTab;
 
 static CSS: Asset = asset!("/assets/styles.css");
@@ -17,6 +19,7 @@ enum Tab {
     Edit,
     Export,
     Settings,
+    Help,
 }
 
 /// タブの切り替えと、タブ間で共有する編集中の絵文字リストの提供を担当する。各タブは常にマウントされ、自身の状態を保持する。
@@ -48,11 +51,18 @@ pub fn App() -> Element {
                     current_tab: current_tab(),
                     onselect: move |tab| current_tab.set(tab),
                 }
+                TabButton {
+                    label: "ヘルプ",
+                    tab: Tab::Help,
+                    current_tab: current_tab(),
+                    onselect: move |tab| current_tab.set(tab),
+                }
             }
             main { class: "workspace",
                 EditTab { active: current_tab() == Tab::Edit }
                 ExportTab { active: current_tab() == Tab::Export }
                 SettingsTab { active: current_tab() == Tab::Settings }
+                HelpTab { active: current_tab() == Tab::Help }
             }
         }
     }

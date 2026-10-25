@@ -543,6 +543,37 @@ body {
   display: none;
 }
 
+.help-tab-content {
+  max-width: 48em;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.help-tab-content h1 {
+  margin: 0 0 0.25em;
+  font-size: 1.5em;
+}
+
+.help-tab-content h2 {
+  margin: 1.5em 0 0.5em;
+  font-size: 1.1em;
+}
+
+.help-tab-content .help-lead {
+  margin: 0;
+  color: #667085;
+}
+
+.help-tab-content ul,
+.help-tab-content ol {
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.help-tab-content li + li {
+  margin-top: 0.25em;
+}
+
 .export-tab-section {
   display: flex;
   flex: 1 1 auto;

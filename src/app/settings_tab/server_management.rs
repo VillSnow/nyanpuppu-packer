@@ -12,6 +12,7 @@ pub fn ServerManagement(
     mut progress: Signal<HashMap<i64, FetchProgress>>,
 ) -> Element {
     let mut url = use_signal(String::new);
+    let mut fetch_results = use_signal(HashMap::<i64, String>::new);
     let server_list = servers.read().clone();
     let progress_by_server = progress.read().clone();
 
@@ -133,6 +134,10 @@ pub fn ServerManagement(
                                         disabled: progress_by_server.contains_key(&server.id),
                                         onclick: move |_| {
                                             let id = server.id;
+                                            fetch_results
+                                                .with_mut(|results| {
+                                                    results.remove(&id);
+                                                });
                                             progress
                                                 .with_mut(|updates| {
                                                     updates.insert(id, FetchProgress::listing(id));
@@ -147,21 +152,28 @@ pub fn ServerManagement(
                                                             .with_mut(|updates| {
                                                                 updates.remove(&id);
                                                             });
-                                                        message
-                                                            .set(
-                                                                format!(
-                                                                    "絵文字 {} 件を取得しました（画像 {} 件のハッシュを作成）",
-                                                                    summary.emoji_count,
-                                                                    summary.image_count,
-                                                                ),
-                                                            );
+                                                        fetch_results
+                                                            .with_mut(|results| {
+                                                                results
+                                                                    .insert(
+                                                                        id,
+                                                                        format!(
+                                                                            "絵文字 {} 件を取得しました（画像 {} 件のハッシュを作成）",
+                                                                            summary.emoji_count,
+                                                                            summary.image_count,
+                                                                        ),
+                                                                    );
+                                                            });
                                                     }
                                                     Err(error) => {
                                                         progress
                                                             .with_mut(|updates| {
                                                                 updates.remove(&id);
                                                             });
-                                                        message.set(error);
+                                                        fetch_results
+                                                            .with_mut(|results| {
+                                                                results.insert(id, error);
+                                                            });
                                                     }
                                                 }
                                             });
@@ -209,6 +221,10 @@ pub fn ServerManagement(
                                                 "取得完了"
                                             }
                                         }
+                                    }
+                                } else if let Some(result) = fetch_results.read().get(&server.id).cloned() {
+                                    div { class: "fetch-progress",
+                                        p { role: "status", "{result}" }
                                     }
                                 }
                             }
