@@ -1169,7 +1169,7 @@ body {
 .emojis-toolbar-controls .matrix-control {
   display: grid;
   grid-template-columns: auto 1fr 9em auto;
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-rows: repeat(5, 1fr);
   gap: 0.5em;
 
   select,

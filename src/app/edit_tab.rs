@@ -317,7 +317,8 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
     let wires_view_box_width = 300.0f64;
 
     let wire = |arg: i32, command: i32| -> Element {
-        let gap = 50.0;
+        let gap = 0.0;
+        let smooth = wires_view_box_width / 2.0;
         let y1 = 50 + arg * 100;
         let y2 = 50 + command * 100;
         let theta = f64::atan2((y2 - y1) as f64, wires_view_box_width as f64);
@@ -328,15 +329,22 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
         let y2 = y2 as f64 - gap * theta.sin();
 
         rsx! {
-            line {
-                x1: "{x1}",
-                y1: "{y1}",
-                x2: "{x2}",
-                y2: "{y2}",
+            path {
+                d: "M {x1} {y1} C {x1+smooth} {y1}, {x2-smooth} {y2}, {x2} {y2}",
                 stroke: "black",
+                fill: "none",
                 marker_end: "url(#arrow)",
                 vector_effect: "non-scaling-stroke",
             }
+            // line {
+            //     x1: "{x1}",
+            //     y1: "{y1}",
+            //     x2: "{x2}",
+            //     y2: "{y2}",
+            //     stroke: "black",
+            //     marker_end: "url(#arrow)",
+            //     vector_effect: "non-scaling-stroke",
+            // }
         }
     };
 
@@ -362,6 +370,14 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                             }
                         }
                         label {
+                            span { "検索値" }
+                            input {
+                                r#type: "text",
+                                value: "{fixed_value}",
+                                oninput: move |event| fixed_value.set(event.value()),
+                            }
+                        }
+                        label {
                             span { "固定値" }
                             input {
                                 r#type: "text",
@@ -374,14 +390,14 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                             select {
                                 value: "{source}",
                                 onchange: move |event| chosen_source.set(event.value()),
-                                for (host, label) in sources.iter() {
+                                for (host , label) in sources.iter() {
                                     option { value: "{host}", "{label}" }
                                 }
                             }
                         }
                     }
                     div { class: "wires",
-                        svg { view_box: "0 0 {wires_view_box_width} 300",
+                        svg { view_box: "0 0 {wires_view_box_width} 500",
                             defs {
                                 marker {
                                     id: "arrow",
@@ -397,11 +413,15 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                                     }
                                 }
                             }
+
                             {wire(0, 0)}
+                            {wire(2, 0)}
                             {wire(0, 1)}
-                            {wire(0, 2)}
-                            {wire(1, 0)}
+                            {wire(1, 1)}
                             {wire(2, 1)}
+                            {wire(0, 2)}
+                            {wire(3, 2)}
+                            {wire(0, 3)}
                         }
                     }
                     div { class: "commands",
@@ -447,11 +467,39 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                                     }
                                 }
                             },
-                            "フィールドに候補サーバーからの値を一括適用する"
+                            "フィールドの文字列を検索して固定値に置換する"
+                        }
+                        button {
+                            r#type: "button",
+                            style: "grid-row: 3;",
+                            disabled: selected_count == 0 || source.is_empty(),
+                            onclick: {
+                                let source = source.clone();
+                                move |_| {
+                                    let field = target_field();
+                                    for emoji in emojis.read().iter() {
+                                        let mut emoji = *emoji;
+                                        if !emoji.read().selected {
+                                            continue;
+                                        }
+                                        let candidate = emoji
+                                            .read()
+                                            .matches
+                                            .iter()
+                                            .filter(|m| m.host == source)
+                                            .min_by_key(|m| m.distance)
+                                            .cloned();
+                                        if let Some(candidate) = candidate {
+                                            field.apply_candidate(&mut emoji.write(), &candidate);
+                                        }
+                                    }
+                                }
+                            },
+                            "フィールドに候補サーバーの値を一括適用する"
                         }
                         button {
                             class: "emojis-toolbar-danger-button",
-                            style: "grid-row: 3;",
+                            style: "grid-row: 4;",
                             r#type: "button",
                             disabled: selected_count == 0,
                             onclick: move |_| {
@@ -465,18 +513,17 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                             },
                             "フィールドをクリアする"
                         }
+                        button {
+                            class: "emojis-toolbar-danger-button",
+                            style: "grid-row: 5;",
+                            r#type: "button",
+                            disabled: selected_count == 0,
+                            onclick: move |_| pending_delete_count.set(Some(selected_count)),
+                            "絵文字を除去する"
+                        }
                     }
                 }
 
-                div { class: "emojis-toolbar-actions",
-                    button {
-                        class: "emojis-toolbar-danger-button",
-                        r#type: "button",
-                        disabled: selected_count == 0,
-                        onclick: move |_| pending_delete_count.set(Some(selected_count)),
-                        "除去"
-                    }
-                }
             }
         }
     }
