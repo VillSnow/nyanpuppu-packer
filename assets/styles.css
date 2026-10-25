@@ -338,6 +338,19 @@ body {
   color: #b54708;
 }
 
+.server-list-item.disabled {
+  background: #f9fafb;
+}
+
+.server-list-item.disabled .server-url {
+  color: #667085;
+}
+
+.disabled-badge {
+  color: #b42318;
+  font-weight: 600;
+}
+
 .text-danger-button {
   border-color: transparent;
   background: transparent;

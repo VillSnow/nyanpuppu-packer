@@ -14,6 +14,7 @@ pub struct Server {
     pub emoji_count: i64,
     pub last_fetched_at: Option<String>,
     pub favorite: bool,
+    pub enabled: bool,
     pub name: Option<String>,
     pub short_name: Option<String>,
 }
@@ -184,6 +185,13 @@ pub async fn set_server_favorite(id: i64, favorite: bool) -> Result<bool, String
     let _ = Reflect::set(&args, &"id".into(), &JsValue::from_f64(id as f64));
     let _ = Reflect::set(&args, &"favorite".into(), &JsValue::from_bool(favorite));
     invoke("set_server_favorite", args.into()).await
+}
+
+pub async fn set_server_enabled(id: i64, enabled: bool) -> Result<bool, String> {
+    let args = Object::new();
+    let _ = Reflect::set(&args, &"id".into(), &JsValue::from_f64(id as f64));
+    let _ = Reflect::set(&args, &"enabled".into(), &JsValue::from_bool(enabled));
+    invoke("set_server_enabled", args.into()).await
 }
 
 pub async fn fetch_server_emojis(id: i64) -> Result<FetchSummary, String> {

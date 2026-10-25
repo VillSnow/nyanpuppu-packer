@@ -20,6 +20,7 @@ pub struct Server {
     emoji_count: i64,
     last_fetched_at: Option<String>,
     favorite: bool,
+    enabled: bool,
     name: Option<String>,
     short_name: Option<String>,
 }
@@ -91,7 +92,7 @@ pub fn find_emoji_matches(
          from query_parts q join hash_parts hp on hp.position = q.position and hp.part = q.part
          join emojis e on e.hash = hp.hash
          left join servers s on s.url = e.host
-         where length(e.hash) = ?
+         where length(e.hash) = ? and coalesce(s.enabled, 1) = 1
          group by e.host, e.hash, e.name, e.category, e.aliases, e.license, s.short_name, s.name
          having count(distinct hp.position) >= ?"
     );
@@ -205,6 +206,12 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     )?;
     ensure_column(&connection, "servers", "name", "text")?;
     ensure_column(&connection, "servers", "short_name", "text")?;
+    ensure_column(
+        &connection,
+        "servers",
+        "enabled",
+        "integer not null default 1",
+    )?;
     Ok(connection)
 }
 
@@ -351,7 +358,7 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
     let connection = open_database(&app)?;
     let mut statement = connection
         .prepare(&format!(
-            "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite, s.name, s.short_name
+            "select s.id, s.url, count(e.name), s.last_fetched_at, s.favorite, s.enabled, s.name, s.short_name
          from servers s left join emojis e on e.host = s.url
          group by s.id
          order by {SERVER_ORDER}"
@@ -365,8 +372,9 @@ pub fn list_servers(app: tauri::AppHandle) -> Result<Vec<Server>, String> {
                 emoji_count: row.get(2)?,
                 last_fetched_at: row.get(3)?,
                 favorite: row.get(4)?,
-                name: row.get(5)?,
-                short_name: row.get(6)?,
+                enabled: row.get(5)?,
+                name: row.get(6)?,
+                short_name: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -380,6 +388,17 @@ pub fn set_server_favorite(app: tauri::AppHandle, id: i64, favorite: bool) -> Re
         .execute(
             "update servers set favorite = ?1 where id = ?2",
             params![favorite, id],
+        )
+        .map(|_| true)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_server_enabled(app: tauri::AppHandle, id: i64, enabled: bool) -> Result<bool, String> {
+    open_database(&app)?
+        .execute(
+            "update servers set enabled = ?1 where id = ?2",
+            params![enabled, id],
         )
         .map(|_| true)
         .map_err(|e| e.to_string())

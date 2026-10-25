@@ -1,6 +1,6 @@
 use crate::backend::{
     FetchProgress, Server, add_server, fetch_server_emojis, list_servers, remove_server,
-    set_server_favorite,
+    set_server_enabled, set_server_favorite,
 };
 use dioxus::prelude::*;
 use std::collections::HashMap;
@@ -85,10 +85,15 @@ pub fn ServerManagement(
                 } else {
                     ul { class: "server-list",
                         for server in server_list.clone() {
-                            li { class: "server-list-item", key: "{server.id}",
+                            li {
+                                class: if server.enabled { "server-list-item" } else { "server-list-item disabled" },
+                                key: "{server.id}",
                                 div { class: "server-details",
                                     strong { class: "server-url", "{server.display_name()}" }
                                     div { class: "server-meta",
+                                        if !server.enabled {
+                                            span { class: "disabled-badge", "照合対象外（無効）" }
+                                        }
                                         if server.display_name() != server.url {
                                             span { "{server.url}" }
                                         }
@@ -126,6 +131,38 @@ pub fn ServerManagement(
                                             "★ お気に入り"
                                         } else {
                                             "☆ お気に入り"
+                                        }
+                                    }
+                                    button {
+                                        class: if server.enabled { "secondary-button" } else { "secondary-button active" },
+                                        r#type: "button",
+                                        aria_pressed: !server.enabled,
+                                        onclick: move |_| {
+                                            let id = server.id;
+                                            let enabled = !server.enabled;
+                                            spawn(async move {
+                                                match set_server_enabled(id, enabled).await {
+                                                    Ok(_) => {
+                                                        if let Ok(items) = list_servers().await {
+                                                            servers.set(items);
+                                                        }
+                                                        message
+                                                            .set(
+                                                                if enabled {
+                                                                    "サーバーを有効にしました".to_string()
+                                                                } else {
+                                                                    "サーバーを無効にしました（照合に使用されません）".to_string()
+                                                                },
+                                                            );
+                                                    }
+                                                    Err(error) => message.set(error),
+                                                }
+                                            });
+                                        },
+                                        if server.enabled {
+                                            "無効にする"
+                                        } else {
+                                            "有効にする"
                                         }
                                     }
                                     button {

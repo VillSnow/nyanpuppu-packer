@@ -737,6 +737,7 @@ pub fn run() {
             add_server,
             remove_server,
             database::set_server_favorite,
+            database::set_server_enabled,
             fetch_server_emojis,
             calculate_image_hash,
             compare_images,
