@@ -15,12 +15,16 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
+            targets: aarch64-apple-darwin,wasm32-unknown-unknown
           - platform: macos-latest
             args: --target x86_64-apple-darwin
+            targets: x86_64-apple-darwin,wasm32-unknown-unknown
           - platform: ubuntu-22.04
             args: ""
+            targets: wasm32-unknown-unknown
           - platform: windows-latest
             args: ""
+            targets: wasm32-unknown-unknown
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -33,23 +37,25 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.targets }}
 
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
 
-      - name: tauri-cli
-        run: cargo install tauri-cli --version "^2" --locked
+      - uses: cargo-bins/cargo-binstall@main
+
+      - name: dioxus-cli と tauri-cli をインストール
+        run: cargo binstall -y dioxus-cli tauri-cli
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "App ${{ github.ref_name }}"
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "App ${{ inputs.tag || github.ref_name }}"
           releaseBody: "Assets から OS に合ったインストーラーをダウンロードしてください。"
           releaseDraft: true
-          tauriScript: cargo tauri
           prerelease: false
+          tauriScript: cargo tauri
           args: ${{ matrix.args }}
