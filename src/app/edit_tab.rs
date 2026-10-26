@@ -11,7 +11,10 @@ use std::collections::BTreeMap;
 
 use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
-use dioxus::{html::FileData, prelude::*};
+use dioxus::{
+    html::{FileData, pattern},
+    prelude::*,
+};
 use editing_emoji::EditingEmoji;
 pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
@@ -116,6 +119,21 @@ impl BulkField {
             BulkField::EmojiName => emoji.emoji_name = value.to_owned(),
             BulkField::Aliases => add_alias(emoji, value),
             BulkField::License => emoji.license = value.to_owned(),
+        }
+    }
+
+    /// 値を置き換える。
+    fn replace(self, emoji: &mut EditingEmoji, pattern: &str, fixed: &str) {
+        match self {
+            BulkField::Category => emoji.category = emoji.category.replace(pattern, fixed),
+            BulkField::EmojiName => emoji.emoji_name = emoji.emoji_name.replace(pattern, fixed),
+            BulkField::Aliases => {
+                for alias in &mut emoji.aliases {
+                    *alias = alias.replace(pattern, fixed);
+                }
+                emoji.aliases.retain(|alias| !alias.is_empty());
+            }
+            BulkField::License => emoji.license = emoji.license.replace(pattern, fixed),
         }
     }
 
@@ -289,6 +307,7 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
         .filter(|emoji| emoji.read().selected)
         .count();
     let mut target_field = use_signal(|| BulkField::Category);
+    let mut pattern_value = use_signal(String::new);
     let mut fixed_value = use_signal(String::new);
     let mut chosen_source = use_signal(String::new);
 
@@ -338,8 +357,8 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                 span { "検索値" }
                 input {
                     r#type: "text",
-                    value: "{fixed_value}",
-                    oninput: move |event| fixed_value.set(event.value()),
+                    value: "{pattern_value}",
+                    oninput: move |event| pattern_value.set(event.value()),
                 }
             }
             label {
@@ -434,25 +453,14 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
             button {
                 r#type: "button",
                 disabled: selected_count == 0 || source.is_empty(),
-                onclick: {
-                    let source = source.clone();
-                    move |_| {
-                        let field = target_field();
-                        for emoji in emojis.read().iter() {
-                            let mut emoji = *emoji;
-                            if !emoji.read().selected {
-                                continue;
-                            }
-                            let candidate = emoji
-                                .read()
-                                .matches
-                                .iter()
-                                .filter(|m| m.host == source)
-                                .min_by_key(|m| m.distance)
-                                .cloned();
-                            if let Some(candidate) = candidate {
-                                field.apply_candidate(&mut emoji.write(), &candidate);
-                            }
+                onclick: move |_| {
+                    let field = target_field();
+                    let pattern = pattern_value();
+                    let fixed = fixed_value();
+                    for emoji in emojis.read().iter() {
+                        let mut emoji = *emoji;
+                        if emoji.read().selected {
+                            field.replace(&mut emoji.write(), &pattern, &fixed);
                         }
                     }
                 },
