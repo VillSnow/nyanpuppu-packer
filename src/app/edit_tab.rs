@@ -401,7 +401,7 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
     };
 
     let wires_view_box_width = 300.0f64;
-    let wires_view_box_height = 500.0f64;
+    let wires_view_box_height = 600.0f64;
 
     let args = rsx! {
         div { class: "args",
@@ -488,19 +488,35 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                 }
 
                 {wire(0, 0)}
-                {wire(2, 0)}
                 {wire(0, 1)}
-                {wire(1, 1)}
                 {wire(2, 1)}
                 {wire(0, 2)}
-                {wire(3, 2)}
+                {wire(1, 2)}
+                {wire(2, 2)}
                 {wire(0, 3)}
+                {wire(3, 3)}
+                {wire(0, 4)}
             }
         }
     };
 
     let commands = rsx! {
         div { class: "commands",
+            button {
+                r#type: "button",
+                disabled: selected_count == 0,
+                onclick: move |_| {
+                    let field = target_field();
+                    let value = fixed_value();
+                    for emoji in emojis.read().iter() {
+                        let mut emoji = *emoji;
+                        if emoji.read().selected {
+                            field.apply_fixed(&mut emoji.write(), &value);
+                        }
+                    }
+                },
+                "フィールドが入力済みの絵文字のチェックを外す"
+            }
             button {
                 r#type: "button",
                 disabled: selected_count == 0,

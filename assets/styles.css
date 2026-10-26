@@ -1162,7 +1162,8 @@ body {
 
   display: grid;
   grid-template-columns: max-content auto auto auto;
-  grid-template-rows: repeat(5, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  grid-auto-rows: 1fr;
   gap: 0.5em;
 
   select,
