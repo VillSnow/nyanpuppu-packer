@@ -41,7 +41,7 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: ". -> target"
 
       - uses: cargo-bins/cargo-binstall@main
 
@@ -70,10 +70,10 @@ jobs:
           TARGET_ARG="${{ matrix.args }}"
           if [ -n "$TARGET_ARG" ]; then
             TRIPLE="${TARGET_ARG#--target }"
-            DIR="src-tauri/target/$TRIPLE/release"
+            DIR="target/$TRIPLE/release"
             SUFFIX="$TRIPLE"
           else
-            DIR="src-tauri/target/release"
+            DIR="target/release"
             SUFFIX="${{ runner.os }}"
           fi
           if [ "${{ runner.os }}" = "Windows" ]; then
