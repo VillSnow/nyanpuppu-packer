@@ -11,11 +11,7 @@ use std::collections::BTreeMap;
 
 use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
-use dioxus::{
-    core::Mutations,
-    html::{FileData, KeyCode::E},
-    prelude::*,
-};
+use dioxus::{html::FileData, prelude::*};
 use editing_emoji::EditingEmoji;
 pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
@@ -515,7 +511,7 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                         }
                     }
                 },
-                "フィールドが入力済みの絵文字のチェックを外す"
+                "フィールドが入力済みならば非選択状態にする"
             }
             button {
                 r#type: "button",
@@ -638,6 +634,10 @@ fn ColumnVisibilityCard(visibilities: ColumnVisibilities) -> Element {
                     flag: visibilities.license_fields,
                 }
                 LabeledCheckbox { label: "候補を表示", flag: visibilities.candidates }
+                LabeledCheckbox {
+                    label: "選択状態の絵文字のみ表示",
+                    flag: visibilities.selected_only,
+                }
             }
         }
     }

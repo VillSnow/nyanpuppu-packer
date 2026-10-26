@@ -15,6 +15,7 @@ pub struct ColumnVisibilities {
     pub license_fields: Signal<bool>,
     pub alias_fields: Signal<bool>,
     pub candidates: Signal<bool>,
+    pub selected_only: Signal<bool>,
 }
 
 pub fn use_column_visibilities() -> ColumnVisibilities {
@@ -25,6 +26,7 @@ pub fn use_column_visibilities() -> ColumnVisibilities {
         license_fields: use_signal(|| true),
         alias_fields: use_signal(|| true),
         candidates: use_signal(|| true),
+        selected_only: use_signal(|| false),
     }
 }
 
@@ -145,7 +147,9 @@ pub fn EmojisGrid(visibilities: ColumnVisibilities) -> Element {
             style: "grid-template-columns: {grid_template_columns};",
             EmojiGridHeader { visibilities }
             for emoji in emojis() {
-                EmojiGridRows { emoji, visibilities }
+                if !(visibilities.selected_only)() || emoji.read().selected {
+                    EmojiGridRows { emoji, visibilities }
+                }
             }
         }
 
@@ -487,7 +491,7 @@ fn candidate_buttons(
     rsx! {
         div { class: "cell", style: "grid-column: {column}", hidden: !vis,
             div { class: "v-stack-start sticky-item",
-                for (key, ms) in groups {
+                for (key , ms) in groups {
                     div {
                         class: "candidate-group",
                         style: "height: calc(var(--organelle-unit) * {ms.len()});",
@@ -519,7 +523,7 @@ fn source_host_labels(column: &str, vis: bool, groups: &Vec<(String, Vec<EmojiMa
     rsx! {
         div { class: "cell", style: "grid-column: {column}", hidden: !vis,
             div { class: "v-stack-start sticky-item",
-                for (_, ms) in groups {
+                for (_ , ms) in groups {
                     div { class: "candidate-group",
                         for m in ms {
                             div { class: "organelle",
