@@ -59,3 +59,27 @@ jobs:
           prerelease: false
           tauriScript: cargo tauri
           args: ${{ matrix.args }}
+
+      - name: 単体実行ファイルをリリースに添付
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          NAME="nyanpuppu-packer"
+          TARGET_ARG="${{ matrix.args }}"
+          if [ -n "$TARGET_ARG" ]; then
+            TRIPLE="${TARGET_ARG#--target }"
+            DIR="src-tauri/target/$TRIPLE/release"
+            SUFFIX="$TRIPLE"
+          else
+            DIR="src-tauri/target/release"
+            SUFFIX="${{ runner.os }}"
+          fi
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "$DIR/$NAME.exe" "${NAME}-${SUFFIX}.exe"
+            gh release upload "$TAG" "${NAME}-${SUFFIX}.exe" --clobber
+          else
+            cp "$DIR/$NAME" "${NAME}-${SUFFIX}"
+            gh release upload "$TAG" "${NAME}-${SUFFIX}" --clobber
+          fi
