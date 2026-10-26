@@ -1,5 +1,6 @@
 /dist/
 /target/
 /Cargo.lock
-.github/
+.github/*
+!.github/workflows/
 docs/references/
