@@ -12,15 +12,18 @@ use std::collections::BTreeMap;
 use crate::backend::EmojiMatch;
 use delete_confirmation::DeleteConfirmation;
 use dioxus::{
-    html::{FileData, pattern},
+    core::Mutations,
+    html::{FileData, KeyCode::E},
     prelude::*,
 };
 use editing_emoji::EditingEmoji;
 pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
 use import_emojis::{import_images, import_package};
+
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
-use post_incr::PostIncr;
+
+use regex::Regex;
 use replace_confirmation::ReplaceConfirmation;
 
 /// 「編集」タブ。画像の読み込み・照合・編集と、それに伴う状態を保持する。
@@ -69,6 +72,52 @@ pub fn EditTab(active: bool) -> Element {
         }
         if pending_zip().is_some() {
             ReplaceConfirmation { pending_zip, on_confirm: confirm_zip_import }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ValidatedPattern {
+    Naive { pattern: String },
+    Regex { pattern: String, regex: Regex },
+    InvalidPattern,
+}
+
+impl ValidatedPattern {
+    fn new(pattern: &str) -> Self {
+        let cs = pattern.chars().collect::<Vec<_>>();
+        if cs.is_empty() {
+            return Self::InvalidPattern;
+        }
+        if cs.first() == Some(&'/') && cs.last() == Some(&'/') {
+            if cs.len() <= 2 {
+                return Self::InvalidPattern;
+            }
+            let pattern = cs[1..cs.len() - 1].iter().collect::<String>();
+            match Regex::new(&pattern) {
+                Ok(regex) => Self::Regex { pattern, regex },
+                Err(_) => Self::InvalidPattern,
+            }
+        } else {
+            Self::Naive {
+                pattern: pattern.to_owned(),
+            }
+        }
+    }
+}
+
+impl PartialEq for ValidatedPattern {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ValidatedPattern::Naive { pattern: p1 }, ValidatedPattern::Naive { pattern: p2 }) => {
+                p1 == p2
+            }
+            (
+                ValidatedPattern::Regex { pattern: p1, .. },
+                ValidatedPattern::Regex { pattern: p2, .. },
+            ) => p1 == p2,
+            (ValidatedPattern::InvalidPattern, ValidatedPattern::InvalidPattern) => true,
+            _ => false,
         }
     }
 }
@@ -123,17 +172,33 @@ impl BulkField {
     }
 
     /// 値を置き換える。
-    fn replace(self, emoji: &mut EditingEmoji, pattern: &str, fixed: &str) {
+    fn replace(self, emoji: &mut EditingEmoji, pattern: &ValidatedPattern, fixed: &str) {
+        let replace1 = if let ValidatedPattern::Naive { pattern } = pattern {
+            Some(move |s: &mut String| *s = s.replace(pattern, fixed))
+        } else {
+            None
+        };
+        let replace2 = if let ValidatedPattern::Regex { pattern: _, regex } = pattern {
+            Some(move |s: &mut String| *s = regex.replace_all(s, fixed).into_owned())
+        } else {
+            None
+        };
+
+        let Some(replace) = Option::<&dyn Fn(&mut String)>::or(
+            replace1.as_ref().map(|f| f as _),
+            replace2.as_ref().map(|f| f as _),
+        ) else {
+            return;
+        };
+
         match self {
-            BulkField::Category => emoji.category = emoji.category.replace(pattern, fixed),
-            BulkField::EmojiName => emoji.emoji_name = emoji.emoji_name.replace(pattern, fixed),
+            BulkField::Category => replace(&mut emoji.category),
+            BulkField::EmojiName => replace(&mut emoji.emoji_name),
             BulkField::Aliases => {
-                for alias in &mut emoji.aliases {
-                    *alias = alias.replace(pattern, fixed);
-                }
+                emoji.aliases.iter_mut().for_each(replace);
                 emoji.aliases.retain(|alias| !alias.is_empty());
             }
-            BulkField::License => emoji.license = emoji.license.replace(pattern, fixed),
+            BulkField::License => replace(&mut emoji.license),
         }
     }
 
@@ -310,6 +375,7 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
     let mut pattern_value = use_signal(String::new);
     let mut fixed_value = use_signal(String::new);
     let mut chosen_source = use_signal(String::new);
+    let validated_pattern = use_memo(move || ValidatedPattern::new(&pattern_value()));
 
     let sources = {
         let mut sources = BTreeMap::new();
@@ -452,10 +518,10 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
             }
             button {
                 r#type: "button",
-                disabled: selected_count == 0 || source.is_empty(),
+                disabled: selected_count == 0 || validated_pattern() == ValidatedPattern::InvalidPattern,
                 onclick: move |_| {
                     let field = target_field();
-                    let pattern = pattern_value();
+                    let pattern = validated_pattern();
                     let fixed = fixed_value();
                     for emoji in emojis.read().iter() {
                         let mut emoji = *emoji;
