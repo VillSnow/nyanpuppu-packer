@@ -912,7 +912,7 @@ body {
 .emojis-toolbar {
   display: flex;
   flex-direction: column;
-  align-items: start;
+  align-items: stretch;
   justify-content: space-between;
   gap: 0.75em;
   padding: 0.75em;
@@ -947,15 +947,6 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5em;
-}
-
-.matrix-control {
-  display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5em 0.75em;
 }
 
 .matrix-control label {
@@ -1166,9 +1157,11 @@ body {
   width: min(100%, 22.5em);
 }
 
-.emojis-toolbar-controls .matrix-control {
+.emojis-toolbar .matrix-control {
+  flex: 0 1 auto;
+
   display: grid;
-  grid-template-columns: auto 1fr 9em auto;
+  grid-template-columns: max-content auto auto auto;
   grid-template-rows: repeat(5, 1fr);
   gap: 0.5em;
 

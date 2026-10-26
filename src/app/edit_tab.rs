@@ -17,6 +17,7 @@ pub use editing_emoji::EditingEmojis;
 use emojis_grid::{ColumnVisibilities, EmojisGrid, use_column_visibilities};
 use import_emojis::{import_images, import_package};
 use matching::{MatchingOverlay, MatchingState, rematch_emojis, use_matching_state};
+use post_incr::PostIncr;
 use replace_confirmation::ReplaceConfirmation;
 
 /// 「編集」タブ。画像の読み込み・照合・編集と、それに伴う状態を保持する。
@@ -315,6 +316,52 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
     };
 
     let wires_view_box_width = 300.0f64;
+    let wires_view_box_height = 500.0f64;
+
+    let args = rsx! {
+        div { class: "args",
+            label {
+                span { "対象フィールド" }
+                select {
+                    value: target_field().key(),
+                    onchange: move |event| {
+                        if let Some(field) = BulkField::from_key(&event.value()) {
+                            target_field.set(field);
+                        }
+                    },
+                    for field in BulkField::ALL {
+                        option { value: field.key(), "{field.label()}" }
+                    }
+                }
+            }
+            label {
+                span { "検索値" }
+                input {
+                    r#type: "text",
+                    value: "{fixed_value}",
+                    oninput: move |event| fixed_value.set(event.value()),
+                }
+            }
+            label {
+                span { "固定値" }
+                input {
+                    r#type: "text",
+                    value: "{fixed_value}",
+                    oninput: move |event| fixed_value.set(event.value()),
+                }
+            }
+            label {
+                span { "候補サーバー" }
+                select {
+                    value: "{source}",
+                    onchange: move |event| chosen_source.set(event.value()),
+                    for (host , label) in sources.iter() {
+                        option { value: "{host}", "{label}" }
+                    }
+                }
+            }
+        }
+    };
 
     let wire = |arg: i32, command: i32| -> Element {
         let gap = 0.0;
@@ -333,198 +380,147 @@ fn SelectionActionsCard(mut pending_delete_count: Signal<Option<usize>>) -> Elem
                 d: "M {x1} {y1} C {x1+smooth} {y1}, {x2-smooth} {y2}, {x2} {y2}",
                 stroke: "black",
                 fill: "none",
-                marker_end: "url(#arrow)",
                 vector_effect: "non-scaling-stroke",
             }
-            // line {
-            //     x1: "{x1}",
-            //     y1: "{y1}",
-            //     x2: "{x2}",
-            //     y2: "{y2}",
-            //     stroke: "black",
-            //     marker_end: "url(#arrow)",
-            //     vector_effect: "non-scaling-stroke",
-            // }
         }
+    };
+    let wires = rsx! {
+        div { class: "wires", min_width: "4em",
+            svg {
+                view_box: "0 0 {wires_view_box_width} {wires_view_box_height}",
+                preserve_aspect_ratio: "none",
+                defs {
+                    marker {
+                        id: "arrow",
+                        view_box: "0 0 10 10",
+                        ref_x: "5",
+                        ref_y: "5",
+                        marker_width: "6",
+                        marker_height: "6",
+                        orient: "auto-start-reverse",
+                        path { d: "M 0 0 L 10 5 L 0 10 z", fill: "black" }
+                    }
+                }
+
+                {wire(0, 0)}
+                {wire(2, 0)}
+                {wire(0, 1)}
+                {wire(1, 1)}
+                {wire(2, 1)}
+                {wire(0, 2)}
+                {wire(3, 2)}
+                {wire(0, 3)}
+            }
+        }
+    };
+
+    let commands = rsx! {
+        div { class: "commands",
+            button {
+                r#type: "button",
+                disabled: selected_count == 0,
+                onclick: move |_| {
+                    let field = target_field();
+                    let value = fixed_value();
+                    for emoji in emojis.read().iter() {
+                        let mut emoji = *emoji;
+                        if emoji.read().selected {
+                            field.apply_fixed(&mut emoji.write(), &value);
+                        }
+                    }
+                },
+                "フィールドに固定値を一括適用する"
+            }
+            button {
+                r#type: "button",
+                disabled: selected_count == 0 || source.is_empty(),
+                onclick: {
+                    let source = source.clone();
+                    move |_| {
+                        let field = target_field();
+                        for emoji in emojis.read().iter() {
+                            let mut emoji = *emoji;
+                            if !emoji.read().selected {
+                                continue;
+                            }
+                            let candidate = emoji
+                                .read()
+                                .matches
+                                .iter()
+                                .filter(|m| m.host == source)
+                                .min_by_key(|m| m.distance)
+                                .cloned();
+                            if let Some(candidate) = candidate {
+                                field.apply_candidate(&mut emoji.write(), &candidate);
+                            }
+                        }
+                    }
+                },
+                "フィールドの文字列を検索して固定値に置換する"
+            }
+            button {
+                r#type: "button",
+                disabled: selected_count == 0 || source.is_empty(),
+                onclick: {
+                    let source = source.clone();
+                    move |_| {
+                        let field = target_field();
+                        for emoji in emojis.read().iter() {
+                            let mut emoji = *emoji;
+                            if !emoji.read().selected {
+                                continue;
+                            }
+                            let candidate = emoji
+                                .read()
+                                .matches
+                                .iter()
+                                .filter(|m| m.host == source)
+                                .min_by_key(|m| m.distance)
+                                .cloned();
+                            if let Some(candidate) = candidate {
+                                field.apply_candidate(&mut emoji.write(), &candidate);
+                            }
+                        }
+                    }
+                },
+                "フィールドに候補サーバーの値を一括適用する"
+            }
+            button {
+                class: "emojis-toolbar-danger-button",
+                r#type: "button",
+                disabled: selected_count == 0,
+                onclick: move |_| {
+                    let field = target_field();
+                    for emoji in emojis.read().iter() {
+                        let mut emoji = *emoji;
+                        if emoji.read().selected {
+                            field.clear(&mut emoji.write());
+                        }
+                    }
+                },
+                "フィールドをクリアする"
+            }
+            button {
+                class: "emojis-toolbar-danger-button",
+                r#type: "button",
+                disabled: selected_count == 0,
+                onclick: move |_| pending_delete_count.set(Some(selected_count)),
+                "絵文字を除去する"
+            }
+        }
+
     };
 
     rsx! {
         div { class: "emojis-toolbar",
             p { class: "emojis-toolbar-count", "操作対象: {selected_count} 件" }
 
-            div { class: "emojis-toolbar-controls",
-                div { class: "matrix-control",
-                    div { class: "args",
-                        label {
-                            span { "対象フィールド" }
-                            select {
-                                value: target_field().key(),
-                                onchange: move |event| {
-                                    if let Some(field) = BulkField::from_key(&event.value()) {
-                                        target_field.set(field);
-                                    }
-                                },
-                                for field in BulkField::ALL {
-                                    option { value: field.key(), "{field.label()}" }
-                                }
-                            }
-                        }
-                        label {
-                            span { "検索値" }
-                            input {
-                                r#type: "text",
-                                value: "{fixed_value}",
-                                oninput: move |event| fixed_value.set(event.value()),
-                            }
-                        }
-                        label {
-                            span { "固定値" }
-                            input {
-                                r#type: "text",
-                                value: "{fixed_value}",
-                                oninput: move |event| fixed_value.set(event.value()),
-                            }
-                        }
-                        label {
-                            span { "候補サーバー" }
-                            select {
-                                value: "{source}",
-                                onchange: move |event| chosen_source.set(event.value()),
-                                for (host , label) in sources.iter() {
-                                    option { value: "{host}", "{label}" }
-                                }
-                            }
-                        }
-                    }
-                    div { class: "wires",
-                        svg { view_box: "0 0 {wires_view_box_width} 500",
-                            defs {
-                                marker {
-                                    id: "arrow",
-                                    view_box: "0 0 10 10",
-                                    ref_x: "5",
-                                    ref_y: "5",
-                                    marker_width: "6",
-                                    marker_height: "6",
-                                    orient: "auto-start-reverse",
-                                    path {
-                                        d: "M 0 0 L 10 5 L 0 10 z",
-                                        fill: "black",
-                                    }
-                                }
-                            }
-
-                            {wire(0, 0)}
-                            {wire(2, 0)}
-                            {wire(0, 1)}
-                            {wire(1, 1)}
-                            {wire(2, 1)}
-                            {wire(0, 2)}
-                            {wire(3, 2)}
-                            {wire(0, 3)}
-                        }
-                    }
-                    div { class: "commands",
-                        button {
-                            r#type: "button",
-                            style: "grid-row: 1;",
-                            disabled: selected_count == 0,
-                            onclick: move |_| {
-                                let field = target_field();
-                                let value = fixed_value();
-                                for emoji in emojis.read().iter() {
-                                    let mut emoji = *emoji;
-                                    if emoji.read().selected {
-                                        field.apply_fixed(&mut emoji.write(), &value);
-                                    }
-                                }
-                            },
-                            "フィールドに固定値を一括適用する"
-                        }
-                        button {
-                            r#type: "button",
-                            style: "grid-row: 2;",
-                            disabled: selected_count == 0 || source.is_empty(),
-                            onclick: {
-                                let source = source.clone();
-                                move |_| {
-                                    let field = target_field();
-                                    for emoji in emojis.read().iter() {
-                                        let mut emoji = *emoji;
-                                        if !emoji.read().selected {
-                                            continue;
-                                        }
-                                        let candidate = emoji
-                                            .read()
-                                            .matches
-                                            .iter()
-                                            .filter(|m| m.host == source)
-                                            .min_by_key(|m| m.distance)
-                                            .cloned();
-                                        if let Some(candidate) = candidate {
-                                            field.apply_candidate(&mut emoji.write(), &candidate);
-                                        }
-                                    }
-                                }
-                            },
-                            "フィールドの文字列を検索して固定値に置換する"
-                        }
-                        button {
-                            r#type: "button",
-                            style: "grid-row: 3;",
-                            disabled: selected_count == 0 || source.is_empty(),
-                            onclick: {
-                                let source = source.clone();
-                                move |_| {
-                                    let field = target_field();
-                                    for emoji in emojis.read().iter() {
-                                        let mut emoji = *emoji;
-                                        if !emoji.read().selected {
-                                            continue;
-                                        }
-                                        let candidate = emoji
-                                            .read()
-                                            .matches
-                                            .iter()
-                                            .filter(|m| m.host == source)
-                                            .min_by_key(|m| m.distance)
-                                            .cloned();
-                                        if let Some(candidate) = candidate {
-                                            field.apply_candidate(&mut emoji.write(), &candidate);
-                                        }
-                                    }
-                                }
-                            },
-                            "フィールドに候補サーバーの値を一括適用する"
-                        }
-                        button {
-                            class: "emojis-toolbar-danger-button",
-                            style: "grid-row: 4;",
-                            r#type: "button",
-                            disabled: selected_count == 0,
-                            onclick: move |_| {
-                                let field = target_field();
-                                for emoji in emojis.read().iter() {
-                                    let mut emoji = *emoji;
-                                    if emoji.read().selected {
-                                        field.clear(&mut emoji.write());
-                                    }
-                                }
-                            },
-                            "フィールドをクリアする"
-                        }
-                        button {
-                            class: "emojis-toolbar-danger-button",
-                            style: "grid-row: 5;",
-                            r#type: "button",
-                            disabled: selected_count == 0,
-                            onclick: move |_| pending_delete_count.set(Some(selected_count)),
-                            "絵文字を除去する"
-                        }
-                    }
-                }
-
+            div { class: "matrix-control",
+                {args}
+                {wires}
+                {commands}
             }
+
         }
     }
 }
